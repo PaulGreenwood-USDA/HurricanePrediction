@@ -1,0 +1,1208 @@
+﻿--- PAGE 1 ---
+   
+ 
+ 1 
+EXTENDED RANGE FORECAST OF ATLANTIC SEASONAL HURRICANE 
+ACTIVITY AND LANDFALL STRIKE PROBABILITY FOR 2026 
+ 
+We anticipate that the 2026 Atlantic basin hurricane season will have somewhat below-
+normal activity. Current weak La Ni±a conditions are likely to transition to El Ni±o in the 
+next few months, with the potential for a moderate/strong El Ni±o for the peak of 
+hurricane season. Sea surface temperatures in the western tropical Atlantic are warmer 
+than normal but slightly cooler than normal in the eastern and central tropical Atlantic. 
+We anticipate El Ni±o being the dominant factor for the upcoming hurricane season, 
+driving increased levels of tropical Atlantic vertical wind shear. We are forecasting a 
+below-average probability for major hurricane landfalls along the continental United 
+States coastline and in the Caribbean. As with all hurricane seasons, coastal residents are 
+reminded that it only takes one hurricane making landfall to make it an active season. 
+Thorough preparations should be made every season, regardless of predicted activity. 
+ 
+(as of 9 April 2026) 
+ 
+By Philip J. Klotzbach
+1, Michael M. Bell2, Levi G. Silvers3, Juhyun Lee4, Delißn 
+C≤lon Burgos5 and Nicholas Mesa5 
+With Special Assistance from the TC-RAMS Team6 and Carl J. Schreck III7    
+In Memory of William M. Gray8 
+ 
+Jennifer Dimas and Joshua Rhoten, Colorado State University media representatives, are 
+coordinating media inquiries in English and Spanish. They can be reached at  
+Jennifer.Dimas@colostate.edu and Joshua.Rhoten@colostate.edu, respectively. 
+ 
+Department of Atmospheric Science, Colorado State University, Fort Collins CO 80523 
+ 
+Project Sponsors: 
+ 
+ 
+ 
+1 Senior Research Scientist 
+2 Professor 
+3 Research Scientist 
+4 Post-Doctoral Scientist 
+5 Graduate Research Assistant 
+6 Team members include: Tyler Barbero, Lauren Beard, Deztynee Bryan, Ming-Han Chung, Jen DeHart, 
+Chandler Jenkins, Jinhui Ju and Meghan Stell. 
+7 Research Scholar at NC State University 
+8 Professor Emeritus 
+ 
+
+--- PAGE 2 ---
+   
+ 
+ 2 
+  
+ATLANTIC BASIN SEASONAL HURRICANE FORECAST FOR 2026 
+ 
+ 
+Forecast Parameter and 1991û2020  
+Average (in parentheses) 
+Issue Date 
+9 April 
+2026 
+Named Storms (NS) (14.4) 13 
+Named Storm Days (NSD) (69.4) 55 
+Hurricanes (H) (7.2) 6 
+Hurricane Days (HD) (27.0) 20 
+Major Hurricanes (MH) (3.2) 2 
+Major Hurricane Days (MHD) (7.4) 5 
+Accumulated Cyclone Energy (ACE) (123) 
+ACE West of 60░W (73) 
+90 
+50 
+Net Tropical Cyclone Activity (NTC) (135%) 100 
+ 
+ 
+ 
+PROBABILITIES FOR AT LEAST ONE MAJOR (CATEGORY 3-4-5) 
+HURRICANE LANDFALL ON EACH OF THE FOLLOWING COASTAL 
+AREAS:  
+ 
+1) Entire continental U.S. coastline û 32% (average from 1880û2020 is 43%) 
+ 
+2) U.S. East Coast Including Peninsula Florida (south and east of Cedar Key, 
+Florida) û 15% (average from 1880û2020 is 21%) 
+ 
+3) Gulf Coast from the Florida Panhandle (west and north of Cedar Key, Florida) 
+westward to Brownsville û 20% (average from 1880û2020 is 27%) 
+ 
+PROBABILITY FOR AT LEAST ONE MAJOR (CATEGORY 3-4-5) 
+HURRICANE TRACKING THROUGH THE CARIBBEAN (10û20░N, 88û60░W) 
+ 
+1)  35% (average from 1880û2020 is 47%) 
+--- PAGE 3 ---
+   
+ 
+ 3 
+ABSTRACT 
+ 
+Information obtained through March indicates that the 2026 Atlantic hurricane 
+season will have activity somewhat below the 1991û2020 average. We estimate that 2026 
+will have 13 named storms (average is 14.4), 55 named storm days (average is 69.4), 6 
+hurricanes (average is 7.2), 20 hurricane days (average is 27.0), 2 major (Category 3-4-5) 
+hurricanes (average is 3.2) and 5 major hurricane days (average is 7.4). The probability of 
+U.S. and Caribbean major hurricane landfall is estimated to be below its long-period 
+average. We predict Atlantic basin Accumulated Cyclone Energy (ACE) and Net 
+Tropical Cyclone (NTC) activity in 2026 to be approximately 75 percent of their long-
+term averages.  
+ 
+Coastal residents are reminded that it only takes one hurricane making landfall to 
+make it an active season for them. Thorough preparations should be made for every 
+season, regardless of how much activity is predicted.  
+ 
+This forecast is based on an extended-range early April statistical prediction 
+scheme that was developed using ~40 years of past data. Analog predictors are utilized as 
+well. We are also including statistical/dynamical models based on 25û40 years of past 
+data from the European Centre for Medium Range Weather Forecasts, the UK Met Office 
+and the Centro Euro-Mediterraneo sui Cambiamenti Climatici model. In addition, for the 
+first time this year, we are incorporating forecast output from the Ai2 Climate Emulator û 
+a machine learning-based climate model. Most of this model guidance points towards a 
+somewhat below-normal season. 
+ 
+The tropical Pacific is currently characterized by weak La Ni±a conditions. These 
+La Ni±a conditions are likely to transition to neutral ENSO conditions shortly, with an 
+expected transition to El Ni±o over the next few months. However, there remains 
+considerable uncertainty as to how strong this likely El Ni±o will be by the peak of the 
+2026 Atlantic hurricane season. Sea surface temperatures in the western tropical Atlantic 
+are warmer than normal, while they are slightly cooler than normal in the eastern and 
+central tropical Atlantic. We currently anticipate that a robust El Ni±o will dominate the 
+tropical circulation during the peak of the 2026 Atlantic hurricane season, likely driving 
+above-normal levels of vertical wind shear across the tropical Atlantic and Caribbean.  
+ 
+The early April forecast is the earliest seasonal forecast issued by Colorado State 
+University and has modest long-term skill when evaluated in hindcast mode. The skill of 
+CSUÆs forecast updates increases as the peak of the Atlantic hurricane season approaches. 
+We also present probabilities of exceedance for hurricanes and Accumulated Cyclone 
+Energy to give interested readers a better idea of the uncertainty associated with these 
+forecasts. 
+  
+--- PAGE 4 ---
+   
+ 
+ 4 
+Why issue extended-range forecasts for seasonal 
+hurricane activity? 
+ 
+We are frequently asked this question. Our answer is that it is possible to say 
+something about the probability of the coming yearÆs hurricane activity which is superior 
+to climatology. The Atlantic basin has the largest year-to-year variability of any of the 
+global tropical cyclone basins. People are curious to know how active the upcoming 
+season is likely to be, particularly if you can show hindcast skill improvement over 
+climatology for many past years.  
+ 
+Everyone should realize that it is impossible to precisely predict this seasonÆs 
+hurricane activity in early April. There is, however, much curiosity as to how global 
+ocean and atmosphere features are presently arranged with respect to the probability of an 
+active or inactive hurricane season for the coming year. Our early April statistical and 
+statistical/dynamical hybrid models show strong evidence on ~25û40 years of data that 
+significant improvement over a climatological forecast can be attained. We would never 
+issue a seasonal hurricane forecast unless we had models developed over a long hindcast 
+period which showed skill. We also now include probabilities of exceedance to provide a 
+visualization of the uncertainty associated with these predictions. 
+ 
+We issue these forecasts to satisfy the curiosity of the public and to bring attention 
+to the hurricane problem. There is a general interest in knowing what the odds are for an 
+active or inactive season. One must remember that our forecasts are based on the premise 
+that those global oceanic and atmospheric conditions which preceded comparatively 
+active or inactive hurricane seasons in the past provide meaningful information about 
+similar trends in future seasons.  
+ 
+It is also important that the reader appreciate that these seasonal forecasts are 
+based on statistical and dynamical models which will fail in some years. Moreover, these 
+forecasts do not specifically predict where within the Atlantic basin these storms will 
+strike. The probability of landfall for any one location along the coast is very low and 
+reflects the fact that, in any one season, most U.S. coastal areas will not feel the effects of 
+a hurricane no matter how active the individual season is.  
+ 
+ 
+  
+--- PAGE 5 ---
+   
+ 
+ 5 
+Acknowledgment 
+ 
+These seasonal forecasts were developed by the late Dr. William Gray, who was 
+lead author on these predictions for over 20 years and continued as a co-author until his 
+death in 2016. In addition to pioneering seasonal Atlantic hurricane prediction, he 
+conducted groundbreaking research on a wide variety of other topics including hurricane 
+genesis, hurricane structure and cumulus convection that are discussed in this paper 
+highlighting his research legacy. His investments in both time and energy on these 
+forecasts cannot be acknowledged enough.  
+ 
+We are grateful for support from Commodity Weather Group, Gallagher Re, the 
+Insurance Information Institute, Ironshore Insurance, and IAA. We acknowledge a grant 
+from the G. Unger Vetlesen Foundation for additional financial support.  
+ 
+Colorado State UniversityÆs seasonal hurricane forecasts have benefited greatly 
+from several individuals that were former graduate students of William Gray. Among 
+these former project members are Chris Landsea, John Knaff and Eric Blake. We also 
+would like to thank Jhordanne Jones and Alex DesRosiers, Ph.D. graduates from Michael 
+BellÆs research group, for model development and forecast assistance over the past 
+several years. Thanks also extend to current members of the TC-RAMS team who have 
+provided valuable comments and feedback throughout the forecast preparation process. 
+These members include: Tyler Barbero, Lauren Beard, Deztynee Bryan, Ming-Han 
+Chung, Jen DeHart, Chandler Jenkins, Jinhui Ju and Meghan Stell. 
+ 
+We thank Louis-Philippe Caron and the data team at the Barcelona 
+Supercomputing Centre for providing data and insight on the statistical/dynamical 
+models. We have also benefited from meteorological discussions with Louis-Philippe 
+Caron, Dan Chavas, Jason Dunion, Brian McNoldy, Paul Roundy, Carl Schreck, Mike 
+Ventrice and Peng Xian over the past few years.  
+  
+ 
+ 
+ 
+ 
+ 
+ 
+--- PAGE 6 ---
+   
+ 
+ 6 
+DEFINITIONS AND ACRONYMS 
+ 
+Accumulated Cyclone Energy (ACE) - A measure of a named stormÆs potential for wind destruction defined as the sum of the square of a 
+named stormÆs maximum wind speed (in 104 knots2) for each 6-hour period of its existence. The 1991û2020 average value of this parameter is 
+123 for the Atlantic basin. 
+ 
+Atlantic Multi-Decadal Oscillation (AMO) û A mode of natural variability that occurs in the North Atlantic Ocean and evidencing itself in 
+fluctuations in sea surface temperature and sea level pressure fields. The AMO is likely related to fluctuations in the strength of the oceanic 
+thermohaline circulation. Although several definitions of the AMO are currently used in the literature, we define the AMO based on North 
+Atlantic sea surface temperatures from 50û60░N, 50û10░W and sea level pressure from 0û50░N, 70û10░W.  
+ 
+Atlantic Basin û The area including the entire North Atlantic Ocean, the Caribbean Sea, and the Gulf of Mexico. 
+ 
+El Ni±o û A 12-18 month period during which anomalously warm sea surface temperatures occur in the eastern half of the equatorial Pacific. 
+Moderate or strong El Ni±o events occur irregularly, about once every 3û7 years on average.  
+ 
+ENSO Longitude Index (ELI) û An index defining ENSO that estimates the average longitude of deep convection associated with the Walker 
+Circulation. 
+ 
+Hurricane (H) - A tropical cyclone with sustained low-level winds of 74 miles per hour (33 ms
+-1 or 64 knots) or greater.  
+ 
+Hurricane Day (HD) - A measure of hurricane activity, one unit of which occurs as four 6-hour periods during which a tropical cyclone is 
+observed or is estimated to have hurricane-force winds. 
+ 
+Indian Ocean Dipole (IOD) - An irregular oscillation of sea surface temperatures between the western and eastern tropical Indian Ocean. A 
+positive phase of the IOD occurs when the western Indian Ocean is anomalously warm compared with the eastern Indian Ocean. 
+ 
+Madden Julian Oscillation (MJO) û A globally propagating mode of tropical atmospheric intra-seasonal variability. The wave tends to 
+propagate eastward at approximately 5 ms-1, circling the globe in roughly 30-60 days. 
+ 
+Major Hurricane (MH) - A hurricane which reaches a sustained low-level wind of at least 111 mph (96 knots or 50 ms-1) at some point in its 
+lifetime. This constitutes a category 3 or higher on the Saffir/Simpson scale. 
+ 
+Major Hurricane Day (MHD) - Four 6-hour periods during which a hurricane has an intensity of Saffir/Simpson category 3 or higher.  
+ 
+Named Storm (NS) - A hurricane, a tropical storm or a sub-tropical storm. 
+ 
+Named Storm Day (NSD) - As in HD but for four 6-hour periods during which a tropical or sub-tropical cyclone is observed (or is estimated) 
+to have attained tropical storm-force winds.  
+ 
+Net Tropical Cyclone (NTC) Activity ûAverage seasonal percentage mean of NS, NSD, H, HD, MH, MHD. Gives overall indication of 
+Atlantic basin seasonal hurricane activity. The 1991-2020 average value of this parameter is 135. 
+ 
+Oceanic Nino Index (ONI) û Three-month running mean of SST anomalies in the Nino 3.4 region (5░Sû5░N, 170û120░W) based on centered 
+30-year base periods. 
+ 
+Relative Oceanic Nino Index (RONI) û Three-month running mean of SST anomalies in the Nino 3.4 region (5░Sû5░N, 170û120░W) minus 
+tropically-averaged (20░Sû20░N) SST anomalies multiplied by a scaling factor.  
+ 
+Saffir/Simpson Hurricane Wind Scale û A measurement scale ranging from 1 to 5 of hurricane wind intensity. One is a weak hurricane; 
+whereas, five is the most intense hurricane. 
+ 
+Southern Oscillation Index (SOI) û A normalized measure of the surface pressure difference between Tahiti and Darwin. Low values typically 
+indicate El Ni±o conditions. 
+ 
+Standard Deviation (SD) û A measure used to quantify the variation in a dataset. 
+ 
+Sea Surface Temperature Anomaly (SSTA) û Observed sea surface temperature differenced from a long-period average, typically 1991û2020. 
+ 
+Thermohaline Circulation (THC) û A large-scale circulation in the Atlantic Ocean that is driven by fluctuations in salinity and temperature. 
+When the THC is stronger than normal, the AMO tends to be in its warm (or positive) phase, and more Atlantic hurricanes typically form. 
+ 
+Tropical Cyclone (TC) - A large-scale circular flow occurring within the tropics and subtropics which has its strongest winds at low levels; 
+including hurricanes, tropical storms and other weaker rotating vortices. 
+ 
+Tropical Storm (TS) - A tropical cyclone with maximum sustained winds between 39 mph (18 ms
+-1 or 34 knots) and 73 mph (32 ms-1 or 63 
+knots). 
+ 
+Vertical Wind Shear û The difference in horizontal wind between 200 hPa (approximately 40000 feet or 12 km) and 850 hPa (approximately 
+5000 feet or 1.6 km). 
+ 
+1 knot = 1.15 miles per hour = 0.515 meters per second
+--- PAGE 7 ---
+   
+ 
+ 7 
+1 Introduction 
+ 
+This is the 43rd year in which the CSU Tropical Meteorology Project has made 
+forecasts of the upcoming seasonÆs Atlantic basin hurricane activity. Our research team 
+has shown that a sizable portion of the year-to-year variability of Atlantic tropical 
+cyclone (TC) activity can be forecast with skill exceeding climatology. Five components 
+are used to produce our April forecast. These components are a statistical regression 
+model, a combined statistical/dynamical model, a machine learning-based climate model, 
+a selection of analog seasons, and lastly, qualitative adjustments to accommodate 
+additional processes which may not be explicitly represented by these analyses. The 
+statistical/dynamical models are from the European Centre for Medium-Range Weather 
+Forecasts (ECMWF), the UK Met Office, and the Centro Euro-Mediterraneo sui 
+Cambiamenti Climatici (CMCC). All of these models show skill at predicting TC activity 
+based on ~25û40 years of historical data. For the first time this year, we are also 
+incorporating forecasts from the Ai2 Climate Emulator (ACE2) û a machine learning-
+based climate model. These evolving forecast techniques are based on a variety of 
+climate-related global and regional predictors previously shown to be related to the 
+forthcoming seasonal Atlantic basin TC activity and landfall probability. We believe that 
+seasonal forecasts must be based on methods that show significant hindcast skill in 
+application to long periods of prior data. It is only through hindcast skill that one can 
+demonstrate that seasonal forecast skill is possible. This is a valid methodology provided 
+that the atmosphere continues to behave in the future as it has in the past.  
+ 
+The best predictors do not necessarily have the best individual correlations with 
+hurricane activity. The best forecast parameters are those that explain the portion of the 
+variance of seasonal hurricane activity that are not associated with the other forecast 
+variables. It is possible for an important hurricane forecast parameter to show little direct 
+relationship to a predictand by itself but to have an important influence when included 
+with a set of 2û3 other predictors.  
+ 
+2 April Forecast Methodology 
+ 
+2.1     April Statistical Forecast Scheme 
+ 
+Our current April statistical forecast model uses ECMWF Reanalysis 5 (ERA5; 
+Hersbach et al. 2020). This approach was developed on data from 1979û2020, was 
+independently tested on data for 2021 and 2022 and was used for real-time forecasts in 
+2023û2025. This model shows significant skill in cross-validated hindcasts of 
+Accumulated Cyclone Energy (ACE) (r = 0.67) over the period from 1979û2025 (Figure 
+1). Cross-validation entails that for each year being forecast, the equation is developed on 
+all other years in the hindcast but excluding the year being forecast. So a forecast for 
+1979 would be based on a hindcast equation developed on 1980û2020, a forecast for 
+1980 would be based on a hindcast equation developed on 1979 and 1981û2020, etc. The 
+model performed quite well in 2023 and 2025 but was a significant over-forecast in 2024, 
+due largely to the pronounced lull that occurred during the climatological peak of the 
+2024 season.  
+--- PAGE 8 ---
+   
+ 
+ 8 
+ 
+ Figure 2 displays the locations of each predictor, while Table 1 displays the 
+individual linear correlations between each predictor and ACE over the 1979û2025 
+hindcast/forecast period. All predictors correlate significantly at the 5% level using a 
+two-tailed StudentÆs t-test, and each year is assumed to represent an individual degree of 
+freedom. Table 2 displays the 2026 observed values for each of the three predictors in the 
+statistical forecast scheme. Standard deviations are given relative to a 1991û2020 base 
+period û the current 30-year NOAA climatological period. Table 3 displays the statistical 
+model output for the 2026 hurricane season. The two SST predictors call for a somewhat 
+above-normal Atlantic hurricane season, while the 200 hPa zonal wind predictor calls for 
+a below-average season. The three predictors in combination call for a slightly above-
+normal season. 
+ 
+ 
+ 
+Figure 1: Observed versus early April cross-validated hindcast values of ACE for the 
+statistical model from 1979û2025. 
+ 
+
+--- PAGE 9 ---
+   
+ 
+ 9 
+ 
+Figure 2: Location of predictors for our early April extended-range statistical prediction 
+for the 2026 hurricane season.  
+ 
+Table 1: Linear correlation between early April predictors and ACE over the period from 
+1979û2025.  
+ 
+Predictor Correlation w/ ACE 
+1) JanuaryûMarch SST (30░Sû50░N, 40░Wû10░W) (+) 0.52 
+2) JanuaryûMarch 200 hPa U (17.5░Nû27.5░N, 60░Wû20░W) (+) 0.39 
+3) FebruaryûMarch SST (30░Sû15░N, 140░Eû170░E) (+) 
+ 
+0.52 
+ 
+Table 2: Listing of early April 2026 predictors for the 2026 hurricane season. A plus (+) 
+means that positive deviations of the parameter are associated with increased hurricane 
+activity. SD stands for standard deviation. 
+ 
+Predictor 2026 Forecast 
+Value 
+Impact on 2026 TC 
+Activity 
+1) JanuaryûMarch SST (30░Sû50░N, 40░Wû10░W) (+) +0.5 SD Enhance 
+2) JanuaryûMarch 200 hPa U (17.5░Nû27.5░N, 60░Wû20░W) (+) û1.5 SD Strongly Suppress 
+3) February-March SST (30░Sû15░N, 140░Eû170░E) (+) 
+ 
++1.9 SD Strongly Enhance 
+
+--- PAGE 10 ---
+   
+ 
+ 10 
+Table 3: Statistical model output for the 2026 Atlantic hurricane season and the final 
+adjusted forecast.  
+ 
+Forecast Parameter and 1991û2020  
+Average (in parentheses) 
+Statistical  
+Forecast 
+Final  
+Forecast 
+Named Storms (NS) (14.4) 16.6 13 
+Named Storm Days (NSD) (69.4) 74.6 55 
+Hurricanes (H) (7.2) 7.7 6 
+Hurricane Days (HD) (27.0) 29.8 20 
+Major Hurricanes (MH) (3.2) 3.5 2 
+Major Hurricane Days (MHD) (7.4) 8.4 5 
+Accumulated Cyclone Energy (ACE) (123) 135 90 
+Net Tropical Cyclone Activity (NTC) (135%) 150 100 
+ 
+ 
+The locations and brief descriptions of the predictors for our early April statistical 
+forecast are now discussed. It should be noted that all predictors correlate positively with 
+physical features during August through October that are known to be favorable for 
+elevated levels of hurricane activity. These factors are all generally related to Augustû
+October vertical wind shear in the Atlantic Main Development Region (MDR) from 10û
+20░N, 85û20░W as shown in Figure 3.  
+ 
+ 
+Figure 3: Vertical wind profile in the MDR typically associated with (a) inactive Atlantic 
+basin hurricane seasons and (b) active Atlantic basin hurricane seasons. Note that (a) 
+gives an example of increased vertical wind shear and (b) an example of reduced levels 
+of vertical wind shear.  
+
+--- PAGE 11 ---
+   
+ 
+ 11 
+For each of these predictors, we display a four-panel figure showing linear correlations 
+between values of each predictor and AugustûOctober values of SST, sea level pressure 
+(SLP), 200 hPa zonal wind, and 850 hPa zonal wind. In general, higher values of tropical 
+Atlantic SSTs, lower values of tropical Atlantic SLP,  anomalous tropical Atlantic 
+westerlies at 850 hPa, and anomalous tropical Atlantic easterlies at 200 hPa are 
+associated with active Atlantic basin hurricane seasons. All correlations are displayed 
+using ERA5. 
+ 
+Predictor 1. JanuaryûMarch SST in the tropical and subtropical eastern Atlantic (+) 
+ 
+(30░Sû50░N, 40░Wû10░W) 
+ 
+Warmer-than-normal SSTs in the tropical and subtropical Atlantic during JanuaryûMarch 
+are associated with a weaker-than-normal subtropical high and reduced trade wind 
+strength during the boreal spring (Knaff 1997). Anomalously warm SSTs in Januaryû
+March are correlated with weaker trade winds and weaker upper tropospheric westerly 
+winds, lower-than-normal sea level pressures, and above-normal SSTs in the tropical 
+Atlantic during the following AugustûOctober (Figure 4). All three of these Augustû
+October features are commonly associated with active Atlantic basin hurricane seasons, 
+through reductions in vertical wind shear, increased vertical instability and increased 
+mid-tropospheric moisture, respectively. Predictor 1 correlates quite strongly (r =0.52) 
+with ACE from 1979û2025. Predictor 1 also strongly correlates (r = 0.60) with Augustû
+October values of the SST component of the Atlantic Meridional Mode (AMM) (Kossin 
+and Vimont 2007) from 1979û2025. The AMM has been shown to impact Atlantic 
+hurricane activity through alterations in the position and intensity of the Atlantic Inter-
+Tropical Convergence Zone (ITCZ). Changes in the Atlantic ITCZ bring about changes 
+in tropical Atlantic vertical and horizontal wind shear patterns and in tropical Atlantic 
+SST patterns. 
+ 
+Predictor 2. JanuaryûMarch 200 hPa U in the subtropical North Atlantic (+) 
+ 
+(17.5░Nû27.5░N, 60░Wû20░W) 
+ 
+Anomalously strong winds at upper-levels in the subtropical North Atlantic are 
+associated with anomalously low pressure in the tropical and subtropical Atlantic during 
+JanuaryûMarch. Stronger-than-normal westerly winds at upper levels in the subtropics 
+are also associated with reduced anticyclonic wavebreaking (and associated reduced 
+vertical wind shear) during the peak of the Atlantic hurricane season (Jones et al. 2022). 
+As has been shown in prior work (Knaff 1997), when the Azores High is weaker than 
+normal, Atlantic trade winds are also weaker than normal. These weaker trades inhibit 
+ocean mixing and upwelling, thereby causing anomalous warming of tropical Atlantic 
+SSTs. These warmer SSTs are then associated with lower-than-normal sea level pressures 
+which can create a self-enhancing feedback that relates to lower pressure, weaker trades 
+and warmer SSTs during the hurricane season (Figure 5) (Knaff 1998). All three of these 
+factors are associated with active hurricane seasons. This predictor is also negatively 
+correlated with tropical central Pacific SSTs during AugustûOctober, indicating that La 
+--- PAGE 12 ---
+   
+ 
+ 12 
+Ni±a-like conditions are favored during the boreal summer when anomalously strong 
+upper-level winds predominate over the Atlantic during JanuaryûMarch.  
+ 
+ 
+Predictor 3. FebruaryûMarch SST in the western tropical/subtropical Pacific (+) 
+ 
+(30░Sû15░N, 140░Eû170░E) 
+ 
+Anomalous warmth in the western tropical/subtropical Pacific is associated with lower 
+pressure in the western tropical Pacific and higher pressure in the eastern tropical Pacific, 
+thereby driving stronger trade winds across the tropical Pacific that inhibit El Ni±o 
+development. The development of anomalously high pressure in the eastern tropical 
+Pacific then drives anomalously weak trade winds in the tropical Atlantic, feeding back 
+into both reduced shear and anomalously warm SSTs in the tropical Atlantic by the peak 
+of the Atlantic hurricane season (AugustûOctober) (Figure 6).  
+  
+--- PAGE 13 ---
+   
+ 
+ 13 
+ 
+ 
+ 
+Figure 4: Rank correlations between JanuaryûMarch SST in the tropical and subtropical 
+Atlantic (Predictor 1) and (panel a) AugustûOctober sea surface temperature, (panel b) 
+AugustûOctober sea level pressure, (panel c) AugustûOctober 850 hPa zonal wind and 
+(panel d) AugustûOctober 200 hPa zonal wind. All four of these parameter deviations in 
+the tropical Atlantic are known to be favorable for enhanced hurricane activity.  
+
+--- PAGE 14 ---
+   
+ 
+ 14 
+ 
+Figure 5: As in Figure 4 but for JanuaryûMarch 200 hPa zonal wind in the subtropical 
+North Atlantic. 
+ 
+ 
+
+--- PAGE 15 ---
+   
+ 
+ 15 
+ 
+ 
+Figure 6: As in Figure 4 but for FebruaryûMarch SST in the western tropical/subtropical 
+Pacific. 
+ 
+2.2    April Statistical/Dynamical Forecast Schemes 
+ 
+a) Statistical/Dynamical Model Predictor Ensemble Mean Output 
+ 
+We developed a statistical/dynamical hybrid forecast model scheme that we used 
+for the first time in 2019. This model, developed in partnership with Louis-Philippe 
+Caron and the data team at the Barcelona Supercomputing Centre, originally used output 
+from the ECMWF SEAS5 model to forecast the input to our early August statistical 
+forecast model. We currently use three different models, namely, ECMWF, UK Met, and 
+CMCC, to forecast August SSTs in the eastern/central equatorial Pacific and in the 
+eastern/central North Atlantic. We formerly also included JMA model data, but the 
+output is currently unavailable from our download source 
+(https://cds.climate.copernicus.eu/), due to JMAÆs recent upgrade to a new modeling 
+system. We do anticipate JMA model data becoming available again in the next few 
+months.  
+ 
+We then use the forecasts of these individual models to forecast ACE for the 2026 
+season. ECMWF hindcasts/forecasts are available from 1981û2025, while all other 
+models have data available spanning the period from 1993û2016. All other predictands 
+(e.g., named storms, major hurricanes) are calculated based on their historical 
+relationships with ACE. These model forecasts extend out six months on the Copernicus 
+
+--- PAGE 16 ---
+   
+ 
+ 16 
+website, which is why all forecasts here examine August data. All standard deviations are 
+given relative to a 1993û2016 base period û the period for which all three different 
+models have hindcasts. 
+ 
+Figure 7 displays the locations of the two forecast parameters, while Table 4 
+displays the various statistical/dynamical model forecasts for each of these parameters. 
+All models are calling for a moderate to strong El Ni±o but also a relatively warm 
+subtropical and tropical Atlantic. Table 5 displays the seasonal TC forecast output for the 
+various statistical/dynamical models. These forecasts call for a somewhat below normal  
+2026 season. Figure 8 displays hindcasts for ECMWF forecasts of ACE from 1981û2025, 
+while Figure 9 displays forecasts of ACE from all three statistical/dynamical models from 
+1993û2016 û the joint period where all three models have hindcasts available. Figure 10 
+displays the ECMWF ensemble average August SST forecast for 45░Sû60░N, while 
+Figure 11 displays the ECMWF ensemble average August 200 minus 850 hPa wind shear 
+forecast for the North Atlantic. As would be expected given the very strong El Ni±o that 
+is being forecast by the ECMWF ensemble, vertical wind shear across the Main 
+Development Region is forecast to be extremely high û the second highest in the 
+ECMWF hindcast/forecast period since 1981 (trailing only 2015).  
+ 
+ 
+ 
+Figure 7: Location of predictors for our early April statistical/dynamical extended-range 
+statistical prediction for the 2026 hurricane season. This forecast uses dynamical model 
+predictions from ECMWF, the UK Met Office, and CMCC to predict August SSTs in the 
+two boxes displayed and then uses those predictors to forecast ACE. 
+ 
+
+--- PAGE 17 ---
+   
+ 
+ 17 
+Table 4: Listing of predictions of August large-scale conditions from our 
+statistical/dynamical model output, initialized on 1 March. A plus (+) means that positive 
+deviations of the parameter are associated with increased hurricane activity, while a 
+minus (-) means that negative deviations of the parameter are associated with increased 
+hurricane activity.  
+ 
+ 
+Predictor 
+ECMWF 
+Forecast 
+UK Met 
+Forecast 
+CMCC 
+Forecast 
+1) August SST (10û45░N, 60û20░W) (+) +1.3 SD +2.9 SD +2.0 SD 
+2) August SST (5░Sû5░N, 180û90░W) (-) +2.8 SD +2.2 SD +2.0 SD 
+ 
+Table 5: Summary of our statistical/dynamical forecasts.  
+ 
+Forecast Parameter and 1991û2020 Average 
+ (in parentheses) 
+ECMWF 
+Scheme 
+Met Office 
+Scheme 
+CMCC 
+Scheme 
+Adjusted Final 
+Forecast 
+Named Storms (14.4) 13.7 13.1 13.9 13 
+Named Storm Days (69.4) 55.3 51.5 57.0 55 
+Hurricanes (7.2) 5.7 5.3 5.9 6 
+Hurricane Days (27.0) 19.3 17.3 20.2 20 
+Major Hurricanes (3.2) 2.3 2.1 2.4 2 
+Major Hurricane Days (7.4) 4.6 3.8 4.9 5 
+Accumulated Cyclone Energy Index (123) 89 80 93 90 
+Net Tropical Cyclone Activity (135%) 104 95 108 100 
+ 
+ 
+ 
+Figure 8: Observed versus statistical/dynamical hindcast values of ACE for 1981û2025 
+from ECMWF.  
+ 
+
+--- PAGE 18 ---
+   
+ 
+ 18 
+ 
+ 
+Figure 9: Observed versus statistical/dynamical hindcast values for all four 
+statistical/dynamical models from 1993û2016.  
+ 
+ 
+ 
+Figure 10: ECMWF ensemble average SST anomaly forecast for August 2026.   
+ 
+ 
+
+--- PAGE 19 ---
+   
+ 
+ 19 
+  
+ 
+Figure 11: ECMWF ensemble average 200 minus 850 hPa anomalous wind shear forecast 
+for August 2026.  The vectors denote the shear direction. The blue rectangle denotes the 
+Main Development Region.  
+ 
+2.3   April Artificial Intelligence Model Scheme 
+ 
+ We are debuting a new input to our seasonal forecasts in 2026. We now use the 
+Ai2 Climate Emulator (ACE2) û an artificial intelligence-based climate model û as an 
+additional guidance tool for our outlooks. We force the model with the ECMWF 
+ensemble prediction of SSTs through August 2026. Figure 12 displays the August 2026 
+SST forcing based on the ECMWF ensemble prediction, while Figure 13 shows the 
+August 2026 upper-level wind response. August 250 hPa zonal winds show strong 
+increases across most of the tropical and subtropical Atlantic. While this response is not a 
+perfect match to what is being forecast directly from the ECMWF forecasting system, the 
+general increase in upper-level westerlies indicates a strong increase in vertical wind 
+shear across most of the tropical and subtropical Atlantic, making for conditions which 
+are less favorable for Atlantic TCs.  
+ 
+
+--- PAGE 20 ---
+   
+ 
+ 20 
+ 
+ 
+Figure 12: ACE2 model SST anomaly forcing field for August 2026 (from the ECMWF 
+ensemble average).   
+ 
+ 
+  
+ 
+Figure 13: ACE2 forecast 250 mb zonal wind anomalies for August 2026.   
+ 
+ 
+2.4   April Analog Forecast Scheme 
+ 
+Certain years in the historical record have global oceanic and atmospheric trends 
+which are similar to 2026. These years also provide useful clues as to likely levels of 
+activity that the forthcoming 2026 hurricane season may bring. For this early April 
+extended range forecast, we determine which of the prior years in our database have 
+distinct trends in key environmental conditions which are similar to current March 2026 
+
+--- PAGE 21 ---
+   
+ 
+ 21 
+conditions and, more importantly, projected AugustûOctober 2026 conditions. Table 7 
+lists our analog selections, while Figure 14 shows the composite AugustûOctober SST in 
+our four analog years. 
+ 
+We searched for years that had moderate to strong El Ni±o conditions but also had 
+relatively warm conditions across the MDR. We anticipate that the 2026 hurricane season 
+will have activity near the average of our four analog years for most parameters.  
+ 
+Table 7: Analog years for 2026 with the associated hurricane activity listed for each year.  
+ 
+Year  NS NSD H HD MH MHD ACE NTC 
+2006 10 58.00 5 21.25 2 2.00 83.3 86.8 
+2009 9 30.00 3 12.00 2 3.50 52.6 68.6 
+2015 11 43.50 4 12.00 2 4.00 62.7 81.2 
+2023 20 100.50 7 31.50 3 7.25 148.2 155.9 
+Average 12.5 58.0 4.8 19.2 2.3 4.2 86.7 98.1 
+2026 Forecast 13 55 6 20 2 5 90 100 
+  
+  
+ 
+Figure 14: Average AugustûOctober SST anomalies in our four analog years. 
+ 
+2.3    ACE West of 60░W Forecast 
+ 
+We now explicitly forecast ACE occurring west of 60░W. While there is a 
+relatively robust relationship between basinwide ACE and North Atlantic landfalling 
+hurricanes (defined as hurricanes making landfall west of 60░W), there is an improved 
+relationship between North Atlantic landfalling hurricanes and ACE west of 60░W 
+(Figures 15 and 16) since 1979. In this analysis, we only count one landfall per storm, 
+regardless of whether the storm made multiple landfalls at hurricane strength (e.g., Irmaû
+2017).  
+ 
+
+--- PAGE 22 ---
+   
+ 
+ 22 
+ 
+ 
+Figure 15: Scatterplot showing relationship between basinwide ACE and North Atlantic 
+landfalling hurricanes. 
+ 
+
+--- PAGE 23 ---
+   
+ 
+ 23 
+ 
+ 
+Figure 16: Scatterplot showing relationship between ACE west of 60░W and North 
+Atlantic landfalling hurricanes. 
+ 
+ In general, years characterized by El Ni±o conditions tend to have slightly less 
+ACE west of 60░W than La Ni±a seasons, likely due to both more conducive conditions 
+in the western Atlantic in La Ni±a seasons, as well as an increased chance of recurvature 
+for TCs in El Ni±o seasons (Colbert and Soden 2012). This has certainly been the case in 
+2023, 2024 and 2025. In 2023, a strong El Ni±o occurred, the subtropical high was quite 
+weak, and many of the TCs that occurred recurved east of 60░W. In 2024, the western 
+Atlantic was much busier for TC formations, and 8 of the 11 hurricanes that formed  
+made landfall west of 60░W. While there was considerable ACE generated west of 60░W 
+in 2025, only one hurricane (Melissa), albeit one of the strongest hurricanes on record, 
+made landfall. 48%, 61% and 74% of basinwide ACE occurred west of 60░W in 2023, 
+2024 and 2025, respectively. 
+ 
+We use data from 1979û2025 and base ENSO classifications on the Augustû
+October-averaged Relative Oceanic Nino Index (RONI). Years with a RONI >= 0.5░C 
+are classified as El Ni±o, years with an RONI <= -0.5░C are classified as La Ni±a, while 
+all other seasons are classified as neutral ENSO. The RONI index is calculated by 
+differencing SSTs in the Nino 3.4 region (5░Sû5░N, 170û120░W) from tropical mean 
+SST (20░Sû20░N, 0░û360░) and scaling the time series to match the variability of the 
+observed SST in the Nino 3.4 region. The RONI has recently been adopted by NOAA as 
+its official ENSO classification index.  
+
+--- PAGE 24 ---
+   
+ 
+ 24 
+ 
+We find that 54% of basinwide ACE occurs west of 60░W in El Ni±o years, while 
+63% of basinwide ACE occurs west of 60░W in La Ni±a years (Figure 17). In neutral 
+ENSO years, 56% of basinwide ACE occurs west of 60░W. Given that we are expecting 
+El Ni±o conditions with this outlook, we are estimating ~55% of basinwide ACE to occur 
+west of 60░W in 2026.  
+ 
+ 
+ 
+Figure 17: Percentage of ACE generated west of 60░W by ENSO phase. 
+ 
+2.5 April Forecast Summary and Final Adjusted Forecast 
+ 
+Table 8 shows our final adjusted early April forecast for the 2026 season which is 
+a combination of our statistical scheme, statistical/dynamical schemes, machine learning 
+scheme and analog scheme as well as qualitative adjustments for other factors not 
+explicitly contained in any of these schemes. We favor our statistical/dynamical, machine 
+learning and analog guidance over our statistical guidance due to the relatively high 
+chance for a moderate to strong El Ni±o (discussed in section 4). While most of our 
+model guidance calls for a slightly to somewhat below-normal season, there remains 
+considerable uncertainty with this outlook given uncertainty in the large-scale 
+environmental conditions that will be present during the peak of the upcoming season 
+(AugustûOctober).  
+ 
+
+--- PAGE 25 ---
+   
+ 
+ 25 
+Table 8: Summary of our early April statistical forecast, our statistical/dynamical 
+forecasts, our analog forecast, the average of these five schemes and our adjusted final 
+forecast for the 2026 hurricane season.  
+ 
+Forecast Parameter and 1991û2020 
+Average 
+ (in parentheses) 
+Statistical  
+Scheme 
+ECMWF 
+Scheme 
+Met Office 
+Scheme 
+CMCC 
+Scheme 
+Analog 
+Scheme 
+5-Scheme 
+Average 
+Adjusted Final 
+Forecast 
+Named Storms (14.4) 16.6 13.7 13.1 13.9 12.5 14.0 13 
+Named Storm Days (69.4) 74.6 55.3 51.5 57 58 59.3 55 
+Hurricanes (7.2) 7.7 5.7 5.3 5.9 4.8 5.9 6 
+Hurricane Days (27.0) 29.8 19.3 17.3 20.2 19.2 21.2 20 
+Major Hurricanes (3.2) 3.5 2.3 2.1 2.4 2.3 2.5 2 
+Major Hurricane Days (7.4) 8.4 4.6 3.8 4.9 4.2 5.2 5 
+Accumulated Cyclone Energy Index (123) 135 89 80 93 87 97 90 
+Net Tropical Cyclone Activity (135%) 150 104 95 108 98 111 100 
+  
+3 Forecast Uncertainty 
+ 
+This season we continue to use probability of exceedance curves as discussed in 
+Saunders et al. (2020) to quantify forecast uncertainty. In that paper, we outlined an 
+approach that uses statistical modeling and historical skill of various forecast models to 
+arrive at a probability that the particular values of hurricane numbers and ACE would be 
+exceeded. Here we display probability of exceedance curves for hurricanes and ACE 
+(Figures 18 and 19), using the error distributions calculated from both normalized cross-
+validated statistical as well as the cross-validated statistical/dynamical hindcasts from 
+SEAS5. Hurricane numbers are fit to a Poisson distribution, while ACE is fit to a Weibull 
+distribution. Table 9 displays one standard deviation uncertainty ranges (~68% of all 
+forecasts within this range). This uncertainty estimate is also very similar to the 70% 
+uncertainty range that NOAA provides with its forecasts. We use Poisson distributions 
+for all storm parameters (e.g., named storms, hurricanes and major hurricanes) while we 
+use a Weibull distribution for all integrated parameters except for major hurricane days 
+(e.g., named storm days, ACE, etc.).  We use a Laplace distribution for major hurricane 
+days.  
+ 
+--- PAGE 26 ---
+   
+ 
+ 26 
+ 
+ 
+Figure 18: Probability of exceedance plot for hurricane numbers for the 2026 Atlantic 
+hurricane season. The values on the x-axis indicate that the number of hurricanes exceeds 
+that specific number. For example, 97% of Atlantic hurricane seasons from 1950û2020 
+have had more than two hurricanes. 
+ 
+
+--- PAGE 27 ---
+   
+ 
+ 27 
+ 
+ 
+Figure 19: As in Figure 18 but for ACE. 
+ 
+Table 9: Forecast ranges for each parameter. Note that the forecast spread may not be 
+symmetric around the mean value, given the historical distribution of tropical cyclone 
+activity.  
+ 
+Parameter 2026 
+Forecast 
+Uncertainty Range (68% of Forecasts 
+Likely to Fall in This Range) 
+Named Storms (NS) 13 10 û 16 
+Named Storm Days (NSD) 55 35 û 78 
+Hurricanes (H) 6 4 û 8 
+Hurricane Days (HD) 20 10 û 33 
+Major Hurricanes (MH) 2 1 û 4 
+Major Hurricane Days (MHD) 5 1 û 8 
+Accumulated Cyclone Energy (ACE) 90 49 û 141 
+ACE West of 60░W 50 25 û 85 
+Net Tropical Cyclone (NTC) Activity 100 58 û 151 
+ 
+4 ENSO 
+ 
+Over the past several months, La Ni±a conditions in the tropical Pacific have 
+gradually weakened (Figure 20), with anomalously warm SSTs now predominating in the 
+eastern part of the basin. SST anomalies have increased across the entire tropical Pacific, 
+with the strongest anomalous warming taking place in the far eastern tropical Pacific. 
+
+--- PAGE 28 ---
+   
+ 
+ 28 
+Figure 21 displays the locations of the various Nino regions displayed in Figure 20. 
+Please note that all SST anomalies in the various Nino regions now are calculated as 
+relative SST anomalies, that is, all SST anomalies are calculated relative to the tropical 
+average SST (20░Sû20░N, 0û360░). These relative SST anomalies have been adopted as 
+part of NOAAÆs shift in February 2026 to the Relative Oceanic Nino Index.  
+ 
+   
+ 
+Figure 20: SST anomalies for several ENSO regions over the past year.  Figure courtesy 
+of the Climate Prediction Center.  
+
+--- PAGE 29 ---
+   
+ 
+ 29 
+ 
+ 
+ 
+Figure 21: Location of ENSO SST regions used in Figure 20. Figure courtesy of the 
+National Centers for Environmental Information.  
+ 
+ Upper-ocean heat content anomalies in the eastern and central tropical Pacific 
+have increased rapidly over the past several weeks and now exceed 1░C when averaged 
+from 180░û100░W (Figure 22). Sea surface temperature anomalies are currently slightly 
+below normal across portions of the central tropical Pacific but are warmer than normal 
+off the west coast of South America (Figure 23).   
+ 
+
+--- PAGE 30 ---
+   
+ 
+ 30 
+  
+ 
+Figure 22: Central and eastern equatorial Pacific upper ocean (0û300 meters) heat content 
+anomalies over the past year. Figure courtesy of Climate Prediction Center. 
+ 
+ 
+ 
+Figure 23: Current SST anomalies across the tropical and subtropical Pacific.  
+ 
+Table 10 displays January and March relative SST anomalies for several Nino 
+regions. As noted earlier, over the past two months, relative SST anomalies across the 
+entire eastern and central tropical Pacific have warmed, with more pronounced warming 
+taking place in the eastern part of the basin. 
+ 
+
+--- PAGE 31 ---
+   
+ 
+ 31 
+Table 10: January and March relative SST anomalies for Nino 1+2, Nino 3, Nino 3.4, and 
+Nino 4, respectively. March-January relative SST anomaly differences are also provided.  
+ 
+Region January Relative SST 
+ Anomaly (░C) 
+March Relative  
+SST Anomaly (░C) 
+March û January  
+Relative SST Anomaly (░C) 
+Nino 1+2 -0.5 +1.0 +1.5 
+Nino 3 -0.9 -0.2 +0.7 
+Nino 3.4 -1.0 -0.5 +0.5 
+Nino 4 -0.4 -0.l +0.3 
+ 
+Several robust upwelling (cooling) oceanic Kelvin waves occurred in the central 
+and eastern tropical Pacific late last year (Figure 24). Since that time, two pronounced 
+downwelling (warming) oceanic Kelvin waves have traversed the tropical Pacific, 
+leading to anomalous warming. Another downwelling Kelvin wave has recently 
+developed in the central tropical Pacific, likely providing the final impetus to dissipate 
+the remaining weak La Ni±a signal. While there is still some shallow anomalously cool 
+water in the central tropical Pacific, anomalous temperatures in the top 300 meters of the 
+ocean now exceed 1░C across the entire Pacific. This indicates prime conditions for El 
+Ni±o to develop.  
+ 
+Pronounced westerly wind bursts across the western and central tropical Pacific 
+have likely been the primary trigger for the downwelling oceanic Kelvin waves over the 
+past several months (Figure 25). Westerly wind anomalies have predominated across the 
+central tropical Pacific in recent days.  
+ 
+--- PAGE 32 ---
+   
+ 
+ 32 
+  
+ 
+Figure 24: Upper-ocean (0û300 meter) heat content anomalies in the tropical Pacific 
+since April 2025. Long dashed lines indicate downwelling Kelvin waves, while short 
+dashed lines indicate upwelling Kelvin waves. Downwelling Kelvin waves result in 
+upper-ocean heat content increases, while upwelling Kelvin waves result in upper-ocean 
+heat content decreases.  
+ 
+ 
+
+--- PAGE 33 ---
+   
+ 
+ 33 
+   
+ 
+Figure 25: Anomalous equatorial low-level winds spanning from 120░E to 80░W. Figure 
+courtesy of Climate Prediction Center. 
+ 
+Anomalously weak trade winds (e.g., a westerly wind burst) have occurred across 
+the central tropical Pacific over the past few weeks and are forecast by ECMWF (as well 
+as other models) to persist for the next couple of weeks (Figure 26). We anticipate that 
+this robust westerly wind burst should help transition the tropical Pacific from La Ni±a to 
+El Ni±o relatively quickly.  
+ 
+
+--- PAGE 34 ---
+   
+ 
+ 34 
+ 
+ 
+Figure 27: ECMWF observed and forecast 850-hPa zonal equatorial winds for the next 
+46 days. Figure courtesy of Nick Novella (NOAA/Climate Prediction Center).   
+ 
+There is always considerable uncertainty with the future state of El Ni±o during 
+the Northern Hemisphere spring. The latest plume of ENSO predictions from several 
+statistical and dynamical models shows considerable spread by the peak of the Atlantic 
+hurricane season in AugustûOctober (Figure 28). However, most models are forecasting 
+El Ni±o for the peak of the Atlantic hurricane season.  
+ 
+
+--- PAGE 35 ---
+   
+ 
+ 35 
+ 
+ 
+ 
+Figure 28: ENSO forecasts from various statistical and dynamical models for Nino 3.4 
+SST anomalies based on late February to early March initial conditions. Most models call  
+for either El Ni±o conditions for AugustûOctober. The black arrow delineates the peak of 
+the Atlantic hurricane season (AugustûOctober). Figure courtesy of the International 
+Research Institute (IRI).  
+ 
+The latest official forecast from NOAA strongly favors El Ni±o for Augustû
+October. NOAA is currently predicting an 80% chance of El Ni±o, a 19% chance of 
+ENSO neutral, and a nominal 1% chance of La Ni±a (Figure 29). 
+ 
+ 
+ 
+
+--- PAGE 36 ---
+   
+ 
+ 36 
+  
+ 
+Figure 29: Official probabilistic ENSO forecast from NOAA. The black arrow delineates 
+the peak of the Atlantic hurricane season (AugustûOctober). 
+ 
+Based on the above information, our best estimate is that we will have El Ni±o 
+this summer and fall, with a fairly high chance that we have a moderate to strong El Ni±o 
+by the peak of the Atlantic hurricane season. While the odds of El Ni±o appear quite 
+high, there remains considerable uncertainty as to how this event develops. We will have 
+more to say about El Ni±o and its potential magnitude with our next update on 10 June.  
+ 
+5 Current Atlantic Basin Conditions 
+ 
+Currently, SSTs are warmer than normal in the western tropical Atlantic, while 
+they are slightly below-normal in the central and eastern tropical Atlantic (Figure 30). 
+Over the past several weeks, trade winds across the eastern tropical Atlantic have been 
+stronger than normal (Figure 31). These stronger trade winds have likely been the 
+primary driver of these anomalously cool waters, due to the enhanced evaporation and 
+mixing that occurs with strong trade winds.  
+ 
+Overall, the current SST anomaly pattern across the North Atlantic presents 
+mixed signals relative to Atlantic hurricane activity. While warm SSTs in the western 
+tropical Atlantic correlate well with what is typically observed in April prior to busy 
+hurricane seasons (Figure 32), cool SSTs in the eastern tropical and subtropical Atlantic 
+are typically associated with quieter hurricane seasons.  
+ 
+
+--- PAGE 37 ---
+   
+ 
+ 37 
+ 
+ 
+Figure 30: Late March 2026 North Atlantic SST anomalies.  
+ 
+ 
+ 
+
+--- PAGE 38 ---
+   
+ 
+ 38 
+ 
+ 
+Figure 31: 850 hPa zonal wind anomalies across the North Atlantic Ocean from 1 February 
+through 31 March 2026.  
+ 
+ 
+ 
+ 
+Figure 32: Correlations between April sea surface temperatures in the North Atlantic and 
+annual Atlantic ACE from 1979û2025. Areas within a dashed contour are significant at 
+the 5% level.  
+ 
+6 Tropical Cyclone Impact Probabilities for 2026 
+ 
+
+--- PAGE 39 ---
+   
+ 
+ 39 
+In addition to our basin-side forecast, we calculate the impacts of tropical 
+cyclones for each state and county/parish along the Gulf and East Coasts, tropical 
+cyclone-prone provinces of Canada, states in Mexico, islands in the Caribbean and 
+countries in Central America. We have used NOAAÆs Historical Hurricane Tracks 
+website and selected all named storms, hurricanes and major hurricanes that have tracked 
+within 50 miles of each landmass from 1880û2020.  This approach allows for tropical 
+cyclones that may have made landfall in an immediately adjacent region to be counted for 
+all regions that were in close proximity to the landfall location of the storm. We then fit 
+the observed frequency of storms within 50 miles of each landmass using a Poisson 
+distribution to calculate the climatological odds of one or more events within 50 miles.  
+ 
+ Net landfall probability is shown to be linked to overall Atlantic basin ACE.  
+Long-term statistics show that, on average, the more active the overall Atlantic basin 
+hurricane season is, the greater the probability of hurricane landfalls for various 
+landmasses in the basin. We adjust landfall probabilities based on the ratio of predicted 
+ACE west of 60░W to the average ACE west of 60░W, as almost all landmasses that we 
+are issuing probabilities for are west of 60░W.  
+ 
+Table 11 displays the climatological odds of storms tracking within 50 miles of 
+each state along the Gulf and East Coasts along with the odds in 2026. Landfall 
+probabilities are below their long-term averages. Probabilities for other Atlantic basin 
+landmasses are available on our website. 
+ 
+Given that landfall rates between 1880û2020 and 1991û2020 are similar for the 
+continental US, we adjust all landfall rates relative to the 1991û2020 Atlantic west of 
+60░W ACE climatology. We prefer to use 1880û2020 for landfall statistics to increase the 
+robustness of the historical landfall dataset. Also, storms near landfall are likely better 
+observed than those farther east in the basin prior to the satellite era (e.g., mid-1960s). 
+Slight differences in ACE west of 60░W between the two periods (73 for 1991û2020 vs. 
+66 for 1880û2020) are likely mostly due to improved observational technology in the 
+more recent period. 
+ 
+  
+--- PAGE 40 ---
+   
+ 
+ 40 
+Table 11: Probability of >=1 named storm, hurricane and major hurricane tracking within 
+50 miles of each coastal state from Texas to Maine. Probabilities are provided for both 
+the 1880û2020 climatological average as well as the probability for 2026, based on the 
+latest CSU seasonal hurricane forecast. 
+ 
+ 
+ 
+7 Summary 
+ 
+An analysis of a variety of different atmosphere and ocean measurements 
+(through March) which are known to have long-period statistical relationships with the 
+upcoming season's Atlantic tropical cyclone activity, as well as output from dynamical 
+models, indicate that 2026 will have somewhat below-average activity. The big question 
+mark with this season's predictions is how strong a likely El Ni±o will be.  
+ 
+8 Forthcoming Updated Forecasts of 2026 Hurricane Activity 
+ 
+We will be issuing seasonal updates of our 2026 Atlantic basin hurricane forecasts 
+on Wednesday 10 June, Wednesday 8 July, and Wednesday 5 August. We will also 
+be issuing two-week forecasts for Atlantic TC activity during the climatological peak of 
+the season from AugustûOctober. A verification and discussion of all 2026 forecasts will 
+be issued on Tuesday, 24 November. All of these forecasts will be available on our 
+website.  
+ 
+  
+
+--- PAGE 41 ---
+   
+ 
+ 41 
+9  Verification of Previous Forecasts 
+ 
+CSUÆs seasonal hurricane forecasts have shown considerable improvement in recent 
+years, likely due to a combination of improved physical understanding, adoption of 
+statistical/dynamical models and more reliable reanalysis products. Figure 33 displays 
+correlations between observed and predicted Atlantic hurricanes from 1984û2025, from 
+1984û2013 and from 2014û2025, respectively. Correlation skill has improved at all lead 
+times in recent years, with the most noticeable improvements at longer lead times. While 
+twelve years is a relatively short sample size, improvements in both modeling and 
+physical understanding should continue to result in future improvements in seasonal 
+Atlantic hurricane forecast skill. More detailed verification statistics are also available at: 
+https://tropical.colostate.edu/archive.html#verification 
+  
+ 
+ 
+ 
+Figure 33: CSUÆs real-time forecast skill for Atlantic hurricanes using correlation as the 
+skill metric. Correlation skills are displayed for three separate time periods: 1984û2013, 
+2014û2025 and 1984û2025, respectively. 
+ 
+
