@@ -33,6 +33,13 @@ import pandas as pd
 
 from .config import ASHEVILLE_LAT, ASHEVILLE_LON
 from .geo import haversine_mi
+from .dem import load_dem, upslope_component
+from .moisture import storm_moisture_factor
+from .watershed import (
+    fraction_track_in_watershed,
+    watershed_distance_mi,
+    watershed_proximity_factor,
+)
 
 # Blue Ridge escarpment crest, simplified: a line from
 #   (35.0N, 83.0W)  near Highlands, NC
@@ -122,21 +129,28 @@ class StormTerrainScore:
     storm_id: str
     name: str
     year: int
+    month: int
     min_dist_mi: float
     closest_lat: float
     closest_lon: float
     motion_bearing_at_closest_deg: float | None
     peak_wind_kt: float | None
     decayed_wind_kt: float
-    orographic_factor: float
+    orographic_factor: float          # geometric heuristic, kept for reference
+    upslope_w_ms: float                # actual V . grad(h) at closest, m/s
+    moisture_factor: float
+    watershed_track_frac: float
+    watershed_proximity: float
     rainfall_risk_score: float
 
 
-def score_storm_terrain(track: pd.DataFrame) -> StormTerrainScore | None:
+def score_storm_terrain(track: pd.DataFrame, dem: dict | None = None) -> StormTerrainScore | None:
     """Compute a terrain-aware rainfall risk score for one storm's full track.
 
     `track` is the full HURDAT2 track (not just points within radius) so we
     can compute motion at closest approach.
+    `dem` is the loaded elevation grid (see dem.load_dem). Optional; if None,
+    upslope_w is reported as 0.
     """
     track = track.sort_values("datetime").reset_index(drop=True)
     if track.empty:
@@ -167,17 +181,48 @@ def score_storm_terrain(track: pd.DataFrame) -> StormTerrainScore | None:
     decayed = inland_wind_decay(min_dist, peak or 0.0)
     oro = orographic_rainfall_factor(closest_lon, closest_lat, motion if not np.isnan(motion) else None)
 
-    # Rainfall risk score: scales with proximity, intensity, and orographic factor.
-    # Distance kernel: exp(-d / 75 mi); a TS-strength remnant at the closest
-    # point of the Blue Ridge gets a benchmark score ~ peak_wind / 2.
+    # ---- Real DEM upslope flow at the Blue Ridge crest just SE of Asheville
+    # Eastern semicircle of a NH TC has cyclonic inflow from the south-southeast.
+    # The "right of motion" side gets wind blowing FROM (motion + 180), i.e. for
+    # northward motion (0 deg), wind on the east side blows from the south (180).
+    if not np.isnan(motion):
+        wind_from = (motion + 180.0) % 360.0
+    else:
+        wind_from = 160.0  # default SSE flow
+    upslope_w = 0.0
+    if dem is not None and decayed > 5.0:
+        # Sample on the windward (SE) face of Pisgah Ridge: ~ 35.30N, 82.40W
+        # (south of Asheville, top of the Blue Ridge escarpment proper).
+        upslope_w = upslope_component(
+            dem, 35.30, -82.40,
+            wind_from_deg=wind_from, wind_speed_kt=decayed,
+        )
+
+    # ---- Moisture
+    month = int(track.loc[i, "datetime"].month) if not pd.isna(track.loc[i, "datetime"]) else 9
+    moist = storm_moisture_factor(closest_lat, closest_lon, peak or 25.0, month)
+
+    # ---- Watershed
+    ws_frac = fraction_track_in_watershed(track["lat"].to_numpy(), track["lon"].to_numpy())
+    ws_dist = watershed_distance_mi(closest_lat, closest_lon)
+    ws_prox = watershed_proximity_factor(ws_dist)
+
+    # ---- Combined rainfall risk score
+    # Old proximity kernel x intensity x (geometric oro) x moisture x (1 + upslope boost) x watershed
     dist_kernel = float(np.exp(-min_dist / 75.0))
     intensity = peak or 25.0
-    rainfall_score = float(intensity * dist_kernel * oro / 2.0)
+    upslope_boost = 1.0 + max(0.0, upslope_w) * 5.0  # 1 m/s upslope ~ 6x rainfall (Smith 1979)
+    rainfall_score = float(
+        intensity * dist_kernel * oro * moist * upslope_boost
+        * (0.5 + 0.5 * ws_prox + 0.5 * ws_frac)
+        / 2.0
+    )
 
     return StormTerrainScore(
         storm_id=str(track["storm_id"].iloc[0]),
         name=str(track["name"].iloc[0]),
         year=int(track["year"].iloc[0]),
+        month=month,
         min_dist_mi=min_dist,
         closest_lat=closest_lat,
         closest_lon=closest_lon,
@@ -185,6 +230,10 @@ def score_storm_terrain(track: pd.DataFrame) -> StormTerrainScore | None:
         peak_wind_kt=peak,
         decayed_wind_kt=decayed,
         orographic_factor=oro,
+        upslope_w_ms=upslope_w,
+        moisture_factor=moist,
+        watershed_track_frac=ws_frac,
+        watershed_proximity=ws_prox,
         rainfall_risk_score=rainfall_score,
     )
 
@@ -193,13 +242,15 @@ def score_all_near_storms(
     tracks: pd.DataFrame,
     radius_mi: float,
     start_year: int = 1950,
+    use_dem: bool = True,
 ) -> pd.DataFrame:
     """Score every storm whose track came within `radius_mi` of Asheville."""
+    dem = load_dem() if use_dem else None
     d = haversine_mi(ASHEVILLE_LAT, ASHEVILLE_LON, tracks["lat"].to_numpy(), tracks["lon"].to_numpy())
     near_ids = set(tracks.assign(_d=d).query("_d <= @radius_mi and year >= @start_year")["storm_id"])
     rows = []
     for sid, g in tracks[tracks["storm_id"].isin(near_ids)].groupby("storm_id"):
-        s = score_storm_terrain(g)
+        s = score_storm_terrain(g, dem=dem)
         if s is not None:
             rows.append(s.__dict__)
     df = pd.DataFrame(rows).sort_values("rainfall_risk_score", ascending=False)

@@ -10,7 +10,7 @@ upslope wind component V . grad(h) along each storm track, instead of the
 """
 from __future__ import annotations
 
-import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +22,10 @@ ELEV_API = "https://api.open-meteo.com/v1/elevation"
 # Asheville from the SE.
 LAT_MIN, LAT_MAX = 33.5, 37.5
 LON_MIN, LON_MAX = -84.5, -80.0
-GRID_DEG = 0.10  # ~7 km. ~ 41 x 46 = 1886 cells = ~19 API calls of 100.
+# Coarser 0.20 deg (~14 km) keeps total points under Open-Meteo's free-tier
+# rate window. The Blue Ridge escarpment is ~50 km wide so this still resolves
+# the gradient adequately for an upslope-flow calculation.
+GRID_DEG = 0.20
 
 
 def _grid_axes() -> tuple[np.ndarray, np.ndarray]:
@@ -31,17 +34,25 @@ def _grid_axes() -> tuple[np.ndarray, np.ndarray]:
     return lats, lons
 
 
-def _fetch_batch(lats: list[float], lons: list[float]) -> list[float]:
-    r = requests.get(
-        ELEV_API,
-        params={
-            "latitude": ",".join(f"{x:.4f}" for x in lats),
-            "longitude": ",".join(f"{x:.4f}" for x in lons),
-        },
-        timeout=60,
-    )
-    r.raise_for_status()
-    return r.json()["elevation"]
+def _fetch_batch(lats: list[float], lons: list[float], retries: int = 5) -> list[float]:
+    delay = 1.5
+    for attempt in range(retries):
+        r = requests.get(
+            ELEV_API,
+            params={
+                "latitude": ",".join(f"{x:.4f}" for x in lats),
+                "longitude": ",".join(f"{x:.4f}" for x in lons),
+            },
+            timeout=60,
+        )
+        if r.status_code == 200:
+            return r.json()["elevation"]
+        if r.status_code == 429:
+            time.sleep(delay)
+            delay *= 2
+            continue
+        r.raise_for_status()
+    raise RuntimeError("elevation API: still 429 after retries")
 
 
 def download_dem(cache_path: str | Path = "data/dem.npz") -> Path:
@@ -55,18 +66,26 @@ def download_dem(cache_path: str | Path = "data/dem.npz") -> Path:
     flat_lat = LL.ravel().tolist()
     flat_lon = NN.ravel().tolist()
     elev = np.full(len(flat_lat), np.nan)
-    print(f"Downloading {len(flat_lat)} elevation points from Open-Meteo ...")
+    n = len(flat_lat)
+    print(f"Downloading {n} elevation points from Open-Meteo ...")
     BATCH = 100
-    for i in range(0, len(flat_lat), BATCH):
+    for i in range(0, n, BATCH):
         chunk_lat = flat_lat[i:i + BATCH]
         chunk_lon = flat_lon[i:i + BATCH]
         try:
             elev[i:i + BATCH] = _fetch_batch(chunk_lat, chunk_lon)
         except Exception as e:  # noqa: BLE001
             print(f"  batch {i//BATCH} failed: {e}")
+        time.sleep(0.6)  # gentle throttle
+    missing = int(np.isnan(elev).sum())
+    if missing > n // 4:
+        raise RuntimeError(f"Too many DEM cells missing ({missing}/{n}); aborting cache.")
+    if missing:
+        # Fill any small holes with nearest-neighbour mean of valid values
+        elev[np.isnan(elev)] = float(np.nanmean(elev))
     elev_grid = elev.reshape(LL.shape)
     np.savez_compressed(cache, lats=lats, lons=lons, elev=elev_grid)
-    print(f"  cached -> {cache}")
+    print(f"  cached -> {cache} ({n} cells, {missing} filled)")
     return cache
 
 

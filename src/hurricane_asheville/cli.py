@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 from .active import fetch_active_storms
 from .config import ASHEVILLE_LAT, ASHEVILLE_LON, CSU_2026_FORECAST, DEFAULT_RADIUS_MI
+from .gauge import FLOOD_STAGES_FT, fetch_gauge, fetch_nws_alerts
 from .hurdat import load_hurdat2
 from .risk import build_risk, storms_near_asheville
 from .terrain import score_all_near_storms
@@ -99,24 +100,76 @@ def cmd_plot(args):
 
 def cmd_terrain(args):
     tracks = load_hurdat2(args.cache_dir)
-    df = score_all_near_storms(tracks, radius_mi=args.radius, start_year=args.start_year)
+    df = score_all_near_storms(tracks, radius_mi=args.radius, start_year=args.start_year,
+                               use_dem=not args.no_dem)
     if df.empty:
         print("No storms found.")
         return
     df = df.head(args.top)
-    cols = ["year", "name", "min_dist_mi", "peak_wind_kt", "decayed_wind_kt",
-            "motion_bearing_at_closest_deg", "orographic_factor", "rainfall_risk_score"]
+    cols = ["year", "name", "month", "min_dist_mi", "peak_wind_kt", "decayed_wind_kt",
+            "orographic_factor", "upslope_w_ms", "moisture_factor",
+            "watershed_proximity", "watershed_track_frac", "rainfall_risk_score"]
     fmt = df[cols].copy()
     fmt["min_dist_mi"] = fmt["min_dist_mi"].round(0)
     fmt["decayed_wind_kt"] = fmt["decayed_wind_kt"].round(0)
-    fmt["motion_bearing_at_closest_deg"] = fmt["motion_bearing_at_closest_deg"].round(0)
     fmt["orographic_factor"] = fmt["orographic_factor"].round(2)
+    fmt["upslope_w_ms"] = fmt["upslope_w_ms"].round(2)
+    fmt["moisture_factor"] = fmt["moisture_factor"].round(2)
+    fmt["watershed_proximity"] = fmt["watershed_proximity"].round(2)
+    fmt["watershed_track_frac"] = fmt["watershed_track_frac"].round(2)
     fmt["rainfall_risk_score"] = fmt["rainfall_risk_score"].round(1)
     print(fmt.to_string(index=False))
     print()
-    print("Higher rainfall_risk_score = more orographic flooding potential.")
-    print("Combines proximity, peak intensity, west-of-mountains geometry,")
-    print("and northward motion forcing SE->NW upslope flow on the Blue Ridge.")
+    print("Cols: month=peak month, decayed_wind_kt=Kaplan-DeMaria w/ mountain enhancement,")
+    print("upslope_w_ms = real V . grad(h) at SE escarpment (m/s, +=upslope rainfall),")
+    print("moisture_factor = monthly PWAT climo + tropical surge,")
+    print("watershed_track_frac = fraction of track in French Broad upstream of Asheville.")
+
+
+def cmd_dem(args):
+    from .dem import download_dem
+    download_dem(Path(args.cache_dir) / "dem.npz")
+
+
+def cmd_gauge(args):
+    g = fetch_gauge()
+    if g is None:
+        print("USGS gauge data unavailable.")
+        return
+    print(f"--- USGS {g.site_id}  {g.site_name} ---")
+    print(f"As of           : {g.timestamp}")
+    if g.stage_ft is not None:
+        bar_len = 40
+        frac = min(1.0, g.stage_ft / FLOOD_STAGES_FT['major'])
+        bar = "#" * int(bar_len * frac) + "-" * (bar_len - int(bar_len * frac))
+        print(f"Stage           : {g.stage_ft:6.2f} ft  [{bar}] {g.flood_category}")
+    else:
+        print("Stage           : (no data)")
+    if g.discharge_cfs is not None:
+        print(f"Discharge       : {g.discharge_cfs:8.0f} cfs")
+    print("Flood thresholds: " + ", ".join(
+        f"{k}={v}ft" for k, v in FLOOD_STAGES_FT.items()))
+    if g.stage_ft is not None:
+        print(f"  -> {g.pct_to_minor:5.1f}% of minor-flood stage")
+        print(f"  -> {g.pct_to_major:5.1f}% of major-flood stage")
+    print()
+    alerts = fetch_nws_alerts(ASHEVILLE_LAT, ASHEVILLE_LON)
+    if not alerts:
+        print("No active NWS alerts for Asheville point.")
+        return
+    if alerts:
+        print(f"Active NWS alerts ({len(alerts)}):")
+        for a in alerts:
+            print(f"  [{a['severity']}] {a['event']}")
+            if a['headline']:
+                print(f"     {a['headline']}")
+    else:
+        print("No active NWS alerts for Asheville point.")
+
+
+def cmd_dashboard(args):
+    from .dashboard import run
+    run(host=args.host, port=args.port, debug=args.debug)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -145,7 +198,23 @@ def build_parser() -> argparse.ArgumentParser:
     tr = sub.add_parser("terrain",
                         help="Rank storms by terrain-aware orographic rainfall risk.")
     tr.add_argument("--top", type=int, default=15)
+    tr.add_argument("--no-dem", action="store_true",
+                    help="Skip real-DEM upslope calculation (faster, no download).")
     tr.set_defaults(func=cmd_terrain)
+
+    de = sub.add_parser("dem", help="Pre-download the regional elevation grid.")
+    de.set_defaults(func=cmd_dem)
+
+    ga = sub.add_parser("gauge",
+                        help="Live USGS French Broad gauge + NWS alerts.")
+    ga.set_defaults(func=cmd_gauge)
+
+    db = sub.add_parser("dashboard",
+                        help="Run the live web dashboard (Flask).")
+    db.add_argument("--host", default="127.0.0.1")
+    db.add_argument("--port", type=int, default=5000)
+    db.add_argument("--debug", action="store_true")
+    db.set_defaults(func=cmd_dashboard)
     return p
 
 
