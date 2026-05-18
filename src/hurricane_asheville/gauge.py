@@ -29,6 +29,20 @@ FLOOD_STAGES_FT = {
     "record": 23.10,
 }
 
+# Upstream / nearby gauges that give early warning (hours of lead-time on Asheville).
+# (site_id, label, lat, lon, role)
+UPSTREAM_GAUGES = [
+    ("03439000", "French Broad @ Rosman (headwaters)", 35.1432, -82.8262, "headwaters"),
+    ("03443000", "French Broad @ Blantyre",            35.3576, -82.6171, "upstream"),
+    ("03446000", "Mills River nr Mills River",         35.3876, -82.5643, "tributary"),
+    ("03451000", "Swannanoa River @ Biltmore",         35.5073, -82.5365, "tributary"),
+    ("03451500", "French Broad @ Asheville",           35.6090, -82.5790, "primary"),
+    # WNC mountain coverage (Pisgah/Nantahala forests, Helene hot zones)
+    ("03456500", "Pigeon River @ Canton",              35.5326, -82.8376, "regional"),
+    ("02151500", "Broad River nr Bat Cave (Lake Lure)", 35.4576, -82.2843, "regional"),
+    ("03512000", "Oconaluftee @ Birdtown (Smokies)",   35.4623, -83.3457, "regional"),
+]
+
 
 @dataclass
 class GaugeReading:
@@ -112,6 +126,104 @@ def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
         pct_to_minor=None if stage is None else 100.0 * stage / FLOOD_STAGES_FT["minor"],
         pct_to_major=None if stage is None else 100.0 * stage / FLOOD_STAGES_FT["major"],
     )
+
+
+# ---- 24h history + rate-of-rise -------------------------------------------
+
+def fetch_gauge_history(site_id: str, hours: int = 24,
+                         timeout: int = 20) -> list[tuple[str, float]]:
+    """Last N hours of stage readings as (iso_time, ft)."""
+    try:
+        r = requests.get(
+            USGS_NWIS_URL,
+            params={
+                "sites": site_id,
+                "parameterCd": "00065",
+                "format": "json",
+                "period": f"PT{hours}H",
+            },
+            timeout=timeout,
+            headers={"User-Agent": "hurricane-asheville/0.1"},
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:  # noqa: BLE001
+        print(f"[warn] USGS history fetch failed for {site_id}: {e}")
+        return []
+    series = data.get("value", {}).get("timeSeries", [])
+    if not series:
+        return []
+    out = []
+    for v in series[0]["values"][0]["value"]:
+        try:
+            ft = float(v["value"])
+            if ft == -999999:
+                continue
+            out.append((v["dateTime"], ft))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def rate_of_rise_ft_per_hr(history: list[tuple[str, float]]) -> float | None:
+    """Slope of last ~3 hours of stage readings, ft/hr. Positive = rising."""
+    from datetime import datetime
+    if len(history) < 2:
+        return None
+    # take last 3 hours of points
+    cutoff_n = max(2, min(len(history), 12))  # ~12 readings = 3h at 15-min cadence
+    recent = history[-cutoff_n:]
+    try:
+        t0 = datetime.fromisoformat(recent[0][0].replace("Z", "+00:00"))
+        t1 = datetime.fromisoformat(recent[-1][0].replace("Z", "+00:00"))
+        hrs = (t1 - t0).total_seconds() / 3600.0
+        if hrs <= 0:
+            return None
+        return (recent[-1][1] - recent[0][1]) / hrs
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def eta_to_stage_hours(current_ft: float, target_ft: float,
+                       rate_ft_per_hr: float | None) -> float | None:
+    """Linear extrapolation: hours until current_ft reaches target_ft.
+    Returns None if not rising or already past target."""
+    if rate_ft_per_hr is None or rate_ft_per_hr <= 0.05:
+        return None
+    if current_ft >= target_ft:
+        return 0.0
+    return (target_ft - current_ft) / rate_ft_per_hr
+
+
+def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
+    """Pull current reading + 24h history for every gauge in UPSTREAM_GAUGES."""
+    out = []
+    for site_id, label, lat, lon, role in UPSTREAM_GAUGES:
+        g = fetch_gauge(site_id)
+        hist = fetch_gauge_history(site_id, hours=hours_history)
+        rate = rate_of_rise_ft_per_hr(hist)
+        eta_minor = eta_moderate = eta_major = None
+        if g and g.stage_ft is not None and site_id == SITE_FRENCH_BROAD_ASHEVILLE:
+            eta_minor    = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["minor"], rate)
+            eta_moderate = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["moderate"], rate)
+            eta_major    = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["major"], rate)
+        out.append({
+            "site_id": site_id,
+            "label": label,
+            "role": role,
+            "lat": lat,
+            "lon": lon,
+            "stage_ft": g.stage_ft if g else None,
+            "discharge_cfs": g.discharge_cfs if g else None,
+            "flood_category": g.flood_category if g else "unknown",
+            "timestamp": g.timestamp if g else "",
+            "rate_ft_per_hr": rate,
+            "history": [{"t": t, "ft": v} for t, v in hist[-96:]],  # cap series len
+            "eta_minor_hr": eta_minor,
+            "eta_moderate_hr": eta_moderate,
+            "eta_major_hr": eta_major,
+        })
+    return out
 
 
 # ---- Bonus: NWS active alerts for the Asheville point ----------------------
