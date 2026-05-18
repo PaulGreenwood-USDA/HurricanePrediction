@@ -8,3 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Azure Developer CLI
+.azure/
+
+# GitHub Pages build output
+site/
+
