@@ -67,6 +67,7 @@ def _block_real_network(monkeypatch):
     # overrides them.
     for modname in (
         "hurricane_asheville.active",
+        "hurricane_asheville.bootstrap",
         "hurricane_asheville.buoys",
         "hurricane_asheville.dem",
         "hurricane_asheville.fire_weather",

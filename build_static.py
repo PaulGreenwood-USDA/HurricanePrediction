@@ -48,6 +48,22 @@ def main() -> None:
         except (ValueError, TypeError) as exc:
             print(f"WARNING: could not serialize state.json: {exc}", file=sys.stderr)
 
+    # Append this snapshot to the long-form parquet history store. Never let
+    # history errors break the Pages deploy.
+    try:
+        from hurricane_asheville.history import (DEFAULT_HISTORY_DIR,
+                                                  append_snapshot,
+                                                  history_stats)
+        if state.status_code == 200:
+            data = json.loads(state.data)
+            path = append_snapshot(data, base_dir=DEFAULT_HISTORY_DIR)
+            if path is not None:
+                stats = history_stats()
+                print(f"history: appended -> {path}  "
+                      f"(rows={stats['rows']}, partitions={stats['partitions']})")
+    except Exception as exc:  # noqa: BLE001
+        print(f"WARNING: history append skipped: {exc}", file=sys.stderr)
+
     (out / ".nojekyll").write_text("")
 
 

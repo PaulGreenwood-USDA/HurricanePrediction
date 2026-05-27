@@ -174,6 +174,35 @@ def cmd_dashboard(args):
     run(host=args.host, port=args.port, debug=args.debug)
 
 
+def cmd_ml_bootstrap(args):
+    """One-shot historical backfill of the parquet history store."""
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    from .bootstrap import bootstrap_all
+    summary = bootstrap_all(years=args.years)
+    print("Bootstrap complete:")
+    for k, v in summary.items():
+        print(f"  {k:>22}: {v}")
+
+
+def cmd_ml_history_info(args):
+    """Print an audit summary of the parquet history store."""
+    from .history import history_stats
+    stats = history_stats()
+    if stats["partitions"] == 0:
+        print("No history yet. Run `ml-bootstrap` or wait for hourly Pages refreshes.")
+        return
+    print(f"Partitions   : {stats['partitions']}")
+    print(f"Total rows   : {stats['rows']:,}")
+    print(f"First ts     : {stats['first_ts']}")
+    print(f"Last ts      : {stats['last_ts']}")
+    print(f"Sources      : {', '.join(stats['sources'])}")
+    print(f"Entity counts: {stats['entity_count']}")
+    print(f"Metrics ({len(stats['metrics'])}):")
+    for m in stats["metrics"]:
+        print(f"  - {m}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hurricane-asheville",
                                 description="Hurricane risk analysis for Asheville, NC.")
@@ -217,6 +246,15 @@ def build_parser() -> argparse.ArgumentParser:
     db.add_argument("--port", type=int, default=5000)
     db.add_argument("--debug", action="store_true")
     db.set_defaults(func=cmd_dashboard)
+
+    mb = sub.add_parser("ml-bootstrap",
+                        help="Backfill the parquet history store from USGS + ERA5.")
+    mb.add_argument("--years", type=int, default=5)
+    mb.set_defaults(func=cmd_ml_bootstrap)
+
+    mi = sub.add_parser("ml-history-info",
+                        help="Print an audit summary of the parquet history store.")
+    mi.set_defaults(func=cmd_ml_history_info)
     return p
 
 
