@@ -488,50 +488,133 @@ PAGE = r"""
         ({{ p.nwps_forecast.points|length }} pts, issued {{ p.nwps_forecast.issued or 'n/a' }})
       </div>
     {% endif %}
-    {% set ml = data.get('ml_forecasts', {}).get(data.primary_site) %}
-    {% if ml and (ml.regression or ml.classification) %}
-      <div class="dim" style="margin-top:.3rem;">
-        <b>ML forecast</b> (LightGBM, walk-forward backtest):
-        {% for r in ml.regression %}
-          <span class="stage-pill" style="background:#1e3a5f;">
-            +{{ r.horizon_h }}h: {{ "%.2f"|format(r.predicted_stage_ft) }} ft
-          </span>
-        {% endfor %}
-        {% for c in ml.classification %}
-          {% set pct = (c.probability * 100) | round(0, 'floor') | int %}
-          <span class="stage-pill" style="background:{{ '#7f1d1d' if pct >= 50 else '#3f1d1d' }};">
-            P(&gt;{{ c.threshold }}ft @ +{{ c.horizon_h }}h) = {{ pct }}%
-          </span>
-        {% endfor %}
-      </div>
-    {% endif %}
-    {% set bt = data.get('ml_backtest', {}).get(data.primary_site) %}
-    {% if bt and bt.results %}
-      <div class="dim" style="margin-top:.4rem;">
-        <b>Backtest</b>
-        {% for r in bt.results if r.kind == 'regression' and r.metrics.mae %}
-          &middot; +{{ r.horizon_h }}h MAE {{ "%.2f"|format(r.metrics.mae) }}ft
-        {% endfor %}
-        {% for r in bt.results if r.kind == 'classification' and r.metrics.auc %}
-          &middot; AUC{{ r.horizon_h }}h(&gt;{{ r.threshold }}ft) {{ "%.2f"|format(r.metrics.auc) }}
-        {% endfor %}
-        <div style="margin-top:.3rem; display:flex; gap:.4rem; flex-wrap:wrap;">
-          {% for r in bt.results %}
-            {% for label, path in r.plots.items() %}
-              <a href="ml/{{ path }}" target="_blank"
-                 style="border:1px solid #333; padding:.15rem .35rem;
-                        border-radius:.25rem; font-size:.7rem;
-                        color:var(--accent); text-decoration:none;">
-                {{ r.kind[:3] }} h{{ r.horizon_h }}
-                {% if r.threshold %}thr{{ r.threshold }}{% endif %}
-                {{ label }}
-              </a>
-            {% endfor %}
-          {% endfor %}
+  </div>
+
+  {% set ml = data.get('ml_forecasts', {}).get(data.primary_site) %}
+  {% set bt = data.get('ml_backtest', {}).get(data.primary_site) %}
+  {% if ml and (ml.regression or ml.classification) %}
+  {% set p = data.gauges | selectattr('site_id','equalto',data.primary_site) | first %}
+  {% set fs = data.flood_stages %}
+  {# stage axis goes 0 -> 1.25 * major so the major band is visible #}
+  {% set axis_max = (fs.major * 1.25) if fs and fs.major else 20 %}
+  {# Reduce regression list to a dict by horizon for easy join with classes. #}
+  {% set reg_by_h = {} %}
+  {% for r in ml.regression %}{% set _ = reg_by_h.update({r.horizon_h: r.predicted_stage_ft}) %}{% endfor %}
+  {% set horizons = ml.regression | map(attribute='horizon_h') | list %}
+  {# backtest metrics keyed by (kind, horizon, threshold) #}
+  {% set mae_by_h = {} %}
+  {% set auc_by_ht = {} %}
+  {% if bt and bt.results %}
+    {% for r in bt.results %}
+      {% if r.kind == 'regression' and r.metrics.mae %}
+        {% set _ = mae_by_h.update({r.horizon_h: r.metrics.mae}) %}
+      {% elif r.kind == 'classification' and r.metrics.auc %}
+        {% set _ = auc_by_ht.update({(r.horizon_h, r.threshold): r.metrics.auc}) %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  <div class="card span12">
+    <h2>
+      <span class="jargon" title="{{ data.glossary['ML forecast'] }}">ML stage forecast</span>
+      <span class="dim" style="font-size:.7rem; font-weight:400; letter-spacing:0;
+             text-transform:none; margin-left:.4rem;">
+        LightGBM · trained on USGS history · site {{ data.primary_site }}
+      </span>
+    </h2>
+
+    <div class="ml-grid">
+      {% for h in horizons %}
+        {% set pred = reg_by_h[h] %}
+        {% set cur = (p.stage_ft if p else None) %}
+        {% set delta = (pred - cur) if (cur is not none) else None %}
+        {% set cls_h = ml.classification | selectattr('horizon_h','equalto',h) | list %}
+        {% set bar_class = 'high' if (pred and fs and pred >= fs.minor) else '' %}
+        <div class="ml-horizon">
+          <div class="h-label">+{{ h }} hours</div>
+          <div class="h-stage">{{ "%.2f"|format(pred) }}<small> ft</small></div>
+          {% if delta is not none %}
+            {% set cls = 'up' if delta > 0.05 else ('down' if delta < -0.05 else 'flat') %}
+            {% set arrow = '↑' if delta > 0.05 else ('↓' if delta < -0.05 else '→') %}
+            <div class="h-delta {{ cls }}">
+              {{ arrow }} {{ "%+.2f"|format(delta) }} ft vs now ({{ "%.2f"|format(cur) }} ft)
+            </div>
+          {% endif %}
+          {% if fs %}
+          {% set act_pct  = (fs.action   / axis_max) * 100 %}
+          {% set min_pct  = (fs.minor    / axis_max) * 100 %}
+          {% set mod_pct  = (fs.moderate / axis_max) * 100 %}
+          {% set maj_pct  = (fs.major    / axis_max) * 100 %}
+          {% set now_pct  = ((cur or 0) / axis_max) * 100 %}
+          {% set pred_pct = (pred / axis_max) * 100 %}
+          <div class="ml-bar {{ bar_class }}">
+            <div class="band action"
+                 style="left:{{ act_pct }}%; width:{{ min_pct - act_pct }}%;"></div>
+            <div class="band minor"
+                 style="left:{{ min_pct }}%; width:{{ mod_pct - min_pct }}%;"></div>
+            <div class="band moderate"
+                 style="left:{{ mod_pct }}%; width:{{ maj_pct - mod_pct }}%;"></div>
+            <div class="band major"
+                 style="left:{{ maj_pct }}%; right:0;"></div>
+            <div class="now"  style="left:{{ now_pct }}%;"
+                 title="Current {{ '%.2f'|format(cur or 0) }} ft"></div>
+            <div class="pred" style="left:{{ pred_pct }}%;"
+                 title="Predicted {{ '%.2f'|format(pred) }} ft"></div>
+          </div>
+          <div class="ml-bar-legend">
+            <span>0</span>
+            <span title="action stage">A {{ fs.action }}</span>
+            <span title="minor flood">Mi {{ fs.minor }}</span>
+            <span title="moderate flood">Mo {{ fs.moderate }}</span>
+            <span title="major flood">Mj {{ fs.major }}</span>
+          </div>
+          {% endif %}
+          {% if mae_by_h.get(h) %}
+          <div class="h-delta flat" style="margin-top:.4rem; font-size:.68rem;">
+            backtest MAE ±{{ "%.2f"|format(mae_by_h[h]) }} ft
+          </div>
+          {% endif %}
         </div>
+      {% endfor %}
+    </div>
+
+    {% if ml.classification %}
+    <div class="ml-probs">
+      <div class="dim" style="font-size:.72rem; margin-top:.5rem;">
+        Probability of exceeding flood thresholds
       </div>
+      {% for c in ml.classification | sort(attribute='horizon_h') %}
+        {% set pct = (c.probability * 100) | round(0, 'floor') | int %}
+        {% set sev = 'high' if pct >= 50 else ('med' if pct >= 25 else 'low') %}
+        {% set color = '#ef5350' if pct >= 50 else ('#fb8c00' if pct >= 25 else '#7cb342') %}
+        {% set auc = auc_by_ht.get((c.horizon_h, c.threshold)) %}
+        <div class="ml-prob">
+          <div>&gt; {{ c.threshold }} ft within {{ c.horizon_h }}h</div>
+          <div class="pbar">
+            <div class="fill" style="width:{{ pct }}%; background:{{ color }};"></div>
+          </div>
+          <div class="pct {{ sev }}">
+            {{ pct }}%
+            {% if auc %}<span class="dim" style="font-weight:400; font-size:.65rem;"><br>AUC {{ "%.2f"|format(auc) }}</span>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if bt and bt.results %}
+    <div class="ml-meta">
+      <span><b>Backtest plots:</b></span>
+      {% for r in bt.results %}
+        {% for label, path in r.plots.items() %}
+          <a class="ml-plot-link" href="ml/{{ path }}" target="_blank">
+            {{ r.kind[:3] }} h{{ r.horizon_h }}{% if r.threshold %} &gt;{{ r.threshold }}ft{% endif %} · {{ label }}
+          </a>
+        {% endfor %}
+      {% endfor %}
+    </div>
     {% endif %}
   </div>
+  {% endif %}
 
   <div class="card span4">
     <h2>Asheville weather</h2>
