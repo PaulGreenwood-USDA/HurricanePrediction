@@ -93,6 +93,17 @@ def _collect():
         "season": CSU_2026_FORECAST,
         "asheville": {"lat": ASHEVILLE_LAT, "lon": ASHEVILLE_LON},
     }
+    # Optional ML forecasts -- silently no-op if no trained models are present.
+    try:
+        from .serving import forecast_all
+        from .history import load_history
+        hist = load_history()
+        if not hist.empty:
+            ml = forecast_all(hist)
+            if ml:
+                data["ml_forecasts"] = ml
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("ml forecasts skipped: %s", exc)
     _CACHE["data"] = data
     _CACHE["ts"] = now
     return data
@@ -358,6 +369,23 @@ PAGE = r"""
         peak {{ "%.2f"|format(p.nwps_forecast.peak_ft) }} ft
         {% if p.nwps_forecast.peak_t %} at {{ p.nwps_forecast.peak_t }}{% endif %}
         ({{ p.nwps_forecast.points|length }} pts, issued {{ p.nwps_forecast.issued or 'n/a' }})
+      </div>
+    {% endif %}
+    {% set ml = data.get('ml_forecasts', {}).get(data.primary_site) %}
+    {% if ml and (ml.regression or ml.classification) %}
+      <div class="dim" style="margin-top:.3rem;">
+        <b>ML forecast</b> (LightGBM, walk-forward backtest):
+        {% for r in ml.regression %}
+          <span class="stage-pill" style="background:#1e3a5f;">
+            +{{ r.horizon_h }}h: {{ "%.2f"|format(r.predicted_stage_ft) }} ft
+          </span>
+        {% endfor %}
+        {% for c in ml.classification %}
+          {% set pct = (c.probability * 100) | round(0, 'floor') | int %}
+          <span class="stage-pill" style="background:{{ '#7f1d1d' if pct >= 50 else '#3f1d1d' }};">
+            P(&gt;{{ c.threshold }}ft @ +{{ c.horizon_h }}h) = {{ pct }}%
+          </span>
+        {% endfor %}
       </div>
     {% endif %}
   </div>
