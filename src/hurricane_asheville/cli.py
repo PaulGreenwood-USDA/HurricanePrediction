@@ -203,6 +203,41 @@ def cmd_ml_history_info(args):
         print(f"  - {m}")
 
 
+def cmd_ml_features(args):
+    """Build a feature+target frame for a gauge and (optionally) save it."""
+    from .features import build_training_frame
+    from .history import load_history
+
+    df = load_history()
+    if df.empty:
+        print("No history yet. Run `ml-bootstrap` first.")
+        return
+    horizons = tuple(int(h) for h in args.horizons.split(","))
+    thresholds = (tuple(float(t) for t in args.thresholds.split(","))
+                  if args.thresholds else None)
+    frame = build_training_frame(
+        df, args.target,
+        horizons=horizons,
+        precip_entity_id=args.precip_entity_id,
+        thresholds=thresholds,
+        dropna_features=args.dropna_features,
+    )
+    if frame.empty:
+        print(f"No features built for {args.target} -- is there history for that site?")
+        return
+    feat_cols = [c for c in frame.columns if not c.startswith("y_")]
+    y_cols = [c for c in frame.columns if c.startswith("y_")]
+    print(f"Built features for {args.target}: rows={len(frame):,}")
+    print(f"  feature cols: {len(feat_cols)}")
+    print(f"  target cols : {y_cols}")
+    print(f"  ts range    : {frame.index.min()}  ->  {frame.index.max()}")
+    if args.out:
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_parquet(out)
+        print(f"Wrote {out}  ({out.stat().st_size/1024:.1f} KB)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hurricane-asheville",
                                 description="Hurricane risk analysis for Asheville, NC.")
@@ -255,6 +290,23 @@ def build_parser() -> argparse.ArgumentParser:
     mi = sub.add_parser("ml-history-info",
                         help="Print an audit summary of the parquet history store.")
     mi.set_defaults(func=cmd_ml_history_info)
+
+    mf = sub.add_parser("ml-features",
+                        help="Build a feature+target frame for a gauge.")
+    mf.add_argument("--target", default="03451500",
+                     help="USGS site id to predict (default: French Broad @ Asheville).")
+    mf.add_argument("--horizons", default="6,24,72",
+                     help="Comma-separated forecast horizons in hours.")
+    mf.add_argument("--thresholds", default="",
+                     help="Comma-separated stage thresholds (ft) for peak-above targets.")
+    mf.add_argument("--precip-entity-id", default="asheville",
+                     dest="precip_entity_id",
+                     help="Entity id whose precip series to use (default: 'asheville').")
+    mf.add_argument("--out", default="",
+                     help="Optional parquet output path.")
+    mf.add_argument("--dropna-features", action="store_true",
+                     dest="dropna_features")
+    mf.set_defaults(func=cmd_ml_features)
     return p
 
 
