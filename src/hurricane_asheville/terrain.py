@@ -243,9 +243,13 @@ def score_all_near_storms(
     radius_mi: float,
     start_year: int = 1950,
     use_dem: bool = True,
+    dem_path: str | None = None,
 ) -> pd.DataFrame:
     """Score every storm whose track came within `radius_mi` of Asheville."""
-    dem = load_dem() if use_dem else None
+    if use_dem:
+        dem = load_dem(dem_path) if dem_path else load_dem()
+    else:
+        dem = None
     d = haversine_mi(ASHEVILLE_LAT, ASHEVILLE_LON, tracks["lat"].to_numpy(), tracks["lon"].to_numpy())
     near_ids = set(tracks.assign(_d=d).query("_d <= @radius_mi and year >= @start_year")["storm_id"])
     rows = []

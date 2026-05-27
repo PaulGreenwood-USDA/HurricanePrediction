@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -100,8 +101,9 @@ def cmd_plot(args):
 
 def cmd_terrain(args):
     tracks = load_hurdat2(args.cache_dir)
+    dem_path = str(Path(args.cache_dir) / "dem.npz")
     df = score_all_near_storms(tracks, radius_mi=args.radius, start_year=args.start_year,
-                               use_dem=not args.no_dem)
+                               use_dem=not args.no_dem, dem_path=dem_path)
     if df.empty:
         print("No storms found.")
         return
@@ -219,6 +221,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
     args = build_parser().parse_args(argv)
     args.func(args)
     return 0

@@ -6,7 +6,9 @@ Then open http://127.0.0.1:5000
 """
 from __future__ import annotations
 
+import logging
 import time
+import traceback
 from dataclasses import asdict
 
 from flask import Flask, jsonify, render_template_string
@@ -22,9 +24,22 @@ from .tides import fetch_all_coastal
 from .weather import fetch_current_weather
 
 app = Flask(__name__)
+_log = logging.getLogger(__name__)
 
 _CACHE: dict = {"data": None, "ts": 0.0}
 _TTL_SECONDS = 60.0
+
+
+def _safe(label, fn, default, *args, **kwargs):
+    """Run an upstream fetcher; swallow exceptions so one bad feed cannot
+    break the whole dashboard render (important for the static GitHub Pages
+    build, where any unhandled exception fails the deploy)."""
+    try:
+        return fn(*args, **kwargs)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("dashboard fetch failed (%s): %s", label, exc)
+        traceback.print_exc()
+        return default
 
 
 def _collect():
@@ -32,15 +47,17 @@ def _collect():
     if _CACHE["data"] is not None and now - _CACHE["ts"] < _TTL_SECONDS:
         return _CACHE["data"]
 
-    gauges = fetch_all_gauges()
+    gauges = _safe("gauges", fetch_all_gauges, [])
     primary = next(
         (g for g in gauges if g["site_id"] == SITE_FRENCH_BROAD_ASHEVILLE), None)
-    storms = fetch_active_storms()
-    alerts = fetch_nws_alerts(ASHEVILLE_LAT, ASHEVILLE_LON)
-    weather = fetch_current_weather(ASHEVILLE_LAT, ASHEVILLE_LON)
-    soil = fetch_soil_state(ASHEVILLE_LAT, ASHEVILLE_LON)
-    coastal = fetch_all_coastal()
-    forests = fetch_all_forests(storms)
+    storms = _safe("storms", fetch_active_storms, [])
+    alerts = _safe("alerts", fetch_nws_alerts, [], ASHEVILLE_LAT, ASHEVILLE_LON)
+    weather = _safe("weather", fetch_current_weather, {"error": "unavailable"},
+                    ASHEVILLE_LAT, ASHEVILLE_LON)
+    soil = _safe("soil", fetch_soil_state, {"error": "unavailable"},
+                 ASHEVILLE_LAT, ASHEVILLE_LON)
+    coastal = _safe("coastal", fetch_all_coastal, [])
+    forests = _safe("forests", fetch_all_forests, [], storms)
 
     idx = compute_index(
         primary_gauge=primary,
@@ -173,6 +190,24 @@ PAGE = r"""
                         font-size:.72rem; margin-top:.3rem; display:inline-block; }
   .forest .storm-near { background:#c62828; padding:.2rem .4rem; border-radius:4px;
                         font-size:.72rem; margin-top:.3rem; display:inline-block; }
+  .forest-landslide { margin-top:.5rem; display:flex; flex-wrap:wrap;
+                      align-items:center; gap:.4rem; }
+  .ll-pill { padding:.2rem .5rem; border-radius:999px; font-size:.72rem;
+             font-weight:700; color:#fff; letter-spacing:.05em;
+             text-transform:uppercase; }
+  .ll-inv  { font-size:.72rem; color: var(--dim); }
+  .forest-gauges { margin-top:.45rem; padding-top:.4rem;
+                   border-top: 1px dashed #2a2e36; }
+  .ll-section-title { font-size:.7rem; color: var(--dim); letter-spacing:.08em;
+                      text-transform:uppercase; margin-bottom:.2rem; }
+  .forest-gauge { display:grid;
+                  grid-template-columns: 1fr auto auto;
+                  gap:.4rem; align-items:center;
+                  font-size:.76rem; padding:.15rem 0;
+                  border-bottom: 1px solid #2a2e36; }
+  .forest-gauge:last-child { border-bottom: 0; }
+  .fg-name { color: var(--dim); }
+  .fg-stage { color: var(--text); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -293,6 +328,14 @@ PAGE = r"""
         {% if p.eta_minor_hr is not none %} minor {{ "%.1f"|format(p.eta_minor_hr) }}h{% endif %}
         {% if p.eta_moderate_hr is not none %} &middot; moderate {{ "%.1f"|format(p.eta_moderate_hr) }}h{% endif %}
         {% if p.eta_major_hr is not none %} &middot; major {{ "%.1f"|format(p.eta_major_hr) }}h{% endif %}
+      </div>
+    {% endif %}
+    {% if p and p.nwps_forecast and p.nwps_forecast.peak_ft is not none %}
+      <div class="dim" style="margin-top:.3rem;">
+        <b>NWS NWPS forecast</b>:
+        peak {{ "%.2f"|format(p.nwps_forecast.peak_ft) }} ft
+        {% if p.nwps_forecast.peak_t %} at {{ p.nwps_forecast.peak_t }}{% endif %}
+        ({{ p.nwps_forecast.points|length }} pts, issued {{ p.nwps_forecast.issued or 'n/a' }})
       </div>
     {% endif %}
   </div>
@@ -445,6 +488,65 @@ PAGE = r"""
             {% endif %}
             <span>Districts</span><span>{{ f.districts|join(', ') }}</span>
           </div>
+
+          {% if f.landslide %}
+            <div class="forest-landslide" title="{{ f.landslide.explain }}">
+              <span class="ll-pill" style="background: {{ f.landslide.color }}">
+                Landslide: {{ f.landslide.label }} ({{ f.landslide.score }})
+              </span>
+              {% if f.landslide.inventory and f.landslide.inventory.count %}
+                <span class="ll-inv">{{ f.landslide.inventory.count }} historical event{{ '' if f.landslide.inventory.count == 1 else 's' }} within 25 mi{% if f.landslide.inventory.most_recent_year %} (latest {{ f.landslide.inventory.most_recent_year }}){% endif %}</span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if f.fire_weather %}
+            <div class="forest-landslide" title="{{ f.fire_weather.explain }}">
+              <span class="ll-pill" style="background: {{ f.fire_weather.color }}">
+                Fire wx: {{ f.fire_weather.label }} ({{ f.fire_weather.score }})
+              </span>
+              {% if f.fires_summary and f.fires_summary.count %}
+                <span class="ll-inv">
+                  {{ f.fires_summary.count }} active fire{{ '' if f.fires_summary.count == 1 else 's' }} within 50 mi
+                  ({{ "{:,.0f}".format(f.fires_summary.total_acres) }} ac{% if f.fires_summary.min_contained_pct is not none %}, min {{ f.fires_summary.min_contained_pct|int }}% contained{% endif %})
+                </span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if f.air_quality and not f.air_quality.error and f.air_quality.us_aqi is not none %}
+            <div class="forest-landslide">
+              <span class="ll-pill" style="background: {{ f.air_quality.color }}">
+                AQI: {{ f.air_quality.label }} ({{ f.air_quality.us_aqi|int }})
+              </span>
+              {% if f.air_quality.pm2_5 is not none %}
+                <span class="ll-inv">PM2.5 {{ f.air_quality.pm2_5 }} &micro;g/m&sup3;</span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if f.gauges %}
+            <div class="forest-gauges">
+              <div class="ll-section-title">Nearby USGS gauges</div>
+              {% for g in f.gauges %}
+                <div class="forest-gauge">
+                  <span class="fg-name">{{ g.label }}</span>
+                  <span class="fg-stage">
+                    {% if g.stage_ft is not none %}{{ "%.2f"|format(g.stage_ft) }} ft{% else %}?{% endif %}
+                    {% if g.rate_ft_per_hr is not none and g.rate_ft_per_hr > 0.05 %}
+                      <span class="rate-up">&uarr;</span>
+                    {% elif g.rate_ft_per_hr is not none and g.rate_ft_per_hr < -0.05 %}
+                      <span class="rate-down">&darr;</span>
+                    {% endif %}
+                  </span>
+                  <span class="stage-pill {{ g.flood_category|lower|replace(' flood','')|replace(' stage','') }}">
+                    {{ g.flood_category }}
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
           {% if f.alerts %}
             {% for a in f.alerts[:2] %}
               <span class="alert-mini">{{ a.event }}</span>
@@ -572,6 +674,27 @@ PAGE = r"""
     L.polyline([[s.lat, s.lon], ASH], {color: '#888', weight: 1, dashArray: '4,4'}).addTo(map);
   });
 
+  // Active wildfires (deduplicate across forests; key by IRWIN id or name+coord)
+  const seenFires = new Set();
+  (STATE.forests || []).forEach(f => {
+    (f.fires_nearby || []).forEach(fire => {
+      const key = fire.irwin_id || (fire.name + ':' + fire.lat + ',' + fire.lon);
+      if (seenFires.has(key)) return;
+      seenFires.add(key);
+      const acres = fire.acres || 0;
+      const radius = Math.max(6, Math.min(18, Math.sqrt(acres) * 0.6));
+      L.circleMarker([fire.lat, fire.lon], {
+        radius, color: '#ff6f00', fillColor: '#ff3d00', fillOpacity: .7,
+        weight: 2,
+      }).addTo(map).bindPopup(
+        '<b>&#128293; ' + fire.name + '</b><br>' +
+        (acres ? acres.toLocaleString() + ' ac' : 'size unknown') +
+        (fire.contained_pct != null ? ' &middot; ' + fire.contained_pct + '% contained' : '') + '<br>' +
+        (fire.cause ? 'Cause: ' + fire.cause + '<br>' : '') +
+        '<small>NIFC WFIGS' + (fire.irwin_id ? ' &middot; ' + fire.irwin_id : '') + '</small>');
+    });
+  });
+
   function ageTick() {
     const secs = Math.floor((Date.now()/1000) - STATE.as_of_epoch);
     const el = document.getElementById('age');
@@ -579,7 +702,7 @@ PAGE = r"""
     else el.textContent = Math.floor(secs/60) + 'm ago';
   }
   setInterval(ageTick, 1000);
-  setTimeout(() => location.reload(), 60_000);
+  setTimeout(() => location.reload(), 15 * 60_000);
 </script>
 </body>
 </html>

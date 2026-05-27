@@ -1,12 +1,15 @@
 """Real-time check: any active Atlantic storms threatening Asheville?"""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import requests
 
 from .config import ASHEVILLE_LAT, ASHEVILLE_LON, NHC_ACTIVE_URL
 from .geo import haversine_mi
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -28,7 +31,7 @@ def fetch_active_storms(timeout: int = 20) -> list[ActiveStorm]:
         r.raise_for_status()
         data = r.json()
     except Exception as e:  # noqa: BLE001
-        print(f"[warn] could not fetch NHC active storms: {e}")
+        log.warning("could not fetch NHC active storms: %s", e)
         return []
 
     storms = data.get("activeStorms", []) if isinstance(data, dict) else []

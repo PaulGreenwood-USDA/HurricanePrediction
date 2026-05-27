@@ -41,14 +41,50 @@ def fake_response():
 
 @pytest.fixture(autouse=True)
 def _block_real_network(monkeypatch):
-    """Default: every `requests.get` raises so any un-mocked test fails clearly."""
+    """Patch every per-module `requests.get` so any unmocked call fails loudly.
+
+    Each network-touching module imports `requests` at module scope and calls
+    `requests.get(...)`. We replace that bound symbol on every such module so
+    a test that forgets to set up its own monkeypatch gets a clear failure
+    instead of silently hitting the live API.
+
+    Individual tests still override these patches via
+    `monkeypatch.setattr(mod.requests, "get", ...)`.
+    """
+    import requests as _requests_pkg
+
     def _explode(*args, **kwargs):
         raise AssertionError(
             "Live network call attempted in test (unmocked requests.get): "
             f"args={args}, kwargs={kwargs}"
         )
-    # We do NOT patch the global requests.get - individual tests patch
-    # the per-module `requests` symbol. This keeps tests explicit.
+
+    # Patch the canonical module first so any direct `requests.get` call fails.
+    monkeypatch.setattr(_requests_pkg, "get", _explode)
+
+    # Also patch each per-module rebound `requests` symbol so module-local
+    # calls like `gauge_mod.requests.get(...)` are blocked until a test
+    # overrides them.
+    for modname in (
+        "hurricane_asheville.active",
+        "hurricane_asheville.dem",
+        "hurricane_asheville.fire_weather",
+        "hurricane_asheville.forests",
+        "hurricane_asheville.gauge",
+        "hurricane_asheville.hurdat",
+        "hurricane_asheville.landslide",
+        "hurricane_asheville.smoke_air",
+        "hurricane_asheville.soil",
+        "hurricane_asheville.tides",
+        "hurricane_asheville.weather",
+        "hurricane_asheville.wildfire",
+    ):
+        try:
+            mod = __import__(modname, fromlist=["requests"])
+        except ImportError:
+            continue
+        if hasattr(mod, "requests"):
+            monkeypatch.setattr(mod.requests, "get", _explode, raising=False)
     yield
 
 

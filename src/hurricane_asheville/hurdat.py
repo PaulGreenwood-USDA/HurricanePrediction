@@ -10,6 +10,7 @@ followed by N data lines:
 from __future__ import annotations
 
 import io
+import logging
 import os
 from pathlib import Path
 
@@ -17,6 +18,8 @@ import pandas as pd
 import requests
 
 from .config import HURDAT2_URL
+
+log = logging.getLogger(__name__)
 
 
 def _parse_lat(s: str) -> float:
@@ -37,7 +40,7 @@ def download_hurdat2(cache_path: str | os.PathLike, url: str = HURDAT2_URL) -> P
     cache.parent.mkdir(parents=True, exist_ok=True)
     if cache.exists() and cache.stat().st_size > 100_000:
         return cache
-    print(f"Downloading HURDAT2 from {url} ...")
+    log.info("Downloading HURDAT2 from %s ...", url)
     r = requests.get(url, timeout=60)
     r.raise_for_status()
     cache.write_bytes(r.content)

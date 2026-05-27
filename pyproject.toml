@@ -1,7 +1,7 @@
 [project]
 name = "hurricane-asheville"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tropical-cyclone risk and live flood-hazard analytics for Asheville, NC."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

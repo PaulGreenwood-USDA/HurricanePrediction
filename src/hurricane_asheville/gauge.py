@@ -14,9 +14,12 @@ NWS AHPS flood thresholds for this site (current as of 2025):
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import requests
+
+log = logging.getLogger(__name__)
 
 USGS_NWIS_URL = "https://waterservices.usgs.gov/nwis/iv/"
 SITE_FRENCH_BROAD_ASHEVILLE = "03451500"
@@ -88,7 +91,7 @@ def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
         r.raise_for_status()
         data = r.json()
     except Exception as e:  # noqa: BLE001
-        print(f"[warn] USGS NWIS fetch failed: {e}")
+        log.warning("USGS NWIS fetch failed: %s", e)
         return None
 
     series = data.get("value", {}).get("timeSeries", [])
@@ -148,7 +151,7 @@ def fetch_gauge_history(site_id: str, hours: int = 24,
         r.raise_for_status()
         data = r.json()
     except Exception as e:  # noqa: BLE001
-        print(f"[warn] USGS history fetch failed for {site_id}: {e}")
+        log.warning("USGS history fetch failed for %s: %s", site_id, e)
         return []
     series = data.get("value", {}).get("timeSeries", [])
     if not series:
@@ -196,9 +199,15 @@ def eta_to_stage_hours(current_ft: float, target_ft: float,
 
 
 def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
-    """Pull current reading + 24h history for every gauge in UPSTREAM_GAUGES."""
-    out = []
-    for site_id, label, lat, lon, role in UPSTREAM_GAUGES:
+    """Pull current reading + 24h history for every gauge in UPSTREAM_GAUGES.
+
+    Network calls run in parallel (one thread per gauge) to keep dashboard
+    cold-load under a few seconds.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _one(entry):
+        site_id, label, lat, lon, role = entry
         g = fetch_gauge(site_id)
         hist = fetch_gauge_history(site_id, hours=hours_history)
         rate = rate_of_rise_ft_per_hr(hist)
@@ -207,7 +216,8 @@ def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
             eta_minor    = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["minor"], rate)
             eta_moderate = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["moderate"], rate)
             eta_major    = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["major"], rate)
-        out.append({
+        nwps = fetch_nwps_forecast(site_id) if site_id in NWS_LID_FOR_USGS else None
+        return {
             "site_id": site_id,
             "label": label,
             "role": role,
@@ -218,12 +228,15 @@ def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
             "flood_category": g.flood_category if g else "unknown",
             "timestamp": g.timestamp if g else "",
             "rate_ft_per_hr": rate,
-            "history": [{"t": t, "ft": v} for t, v in hist[-96:]],  # cap series len
+            "history": [{"t": t, "ft": v} for t, v in hist[-96:]],
             "eta_minor_hr": eta_minor,
             "eta_moderate_hr": eta_moderate,
             "eta_major_hr": eta_major,
-        })
-    return out
+            "nwps_forecast": nwps,
+        }
+
+    with ThreadPoolExecutor(max_workers=min(8, len(UPSTREAM_GAUGES))) as pool:
+        return list(pool.map(_one, UPSTREAM_GAUGES))
 
 
 # ---- Bonus: NWS active alerts for the Asheville point ----------------------
@@ -243,7 +256,7 @@ def fetch_nws_alerts(lat: float, lon: float, timeout: int = 20) -> list[dict]:
         r.raise_for_status()
         feats = r.json().get("features", [])
     except Exception as e:  # noqa: BLE001
-        print(f"[warn] NWS alerts fetch failed: {e}")
+        log.warning("NWS alerts fetch failed: %s", e)
         return []
     out = []
     for f in feats:
@@ -256,3 +269,63 @@ def fetch_nws_alerts(lat: float, lon: float, timeout: int = 20) -> list[dict]:
             "ends": p.get("ends", ""),
         })
     return out
+
+
+# ---- NWS National Water Prediction Service forecast traces -----------------
+
+# Mapping from USGS site ID to NWS gauge ID (NWSLI / lid). NWPS uses NWS IDs,
+# not USGS IDs, for forecast traces.  Lookups: https://water.noaa.gov/
+NWS_LID_FOR_USGS = {
+    "03451500": "ASHN7",   # French Broad @ Asheville
+    "03451000": "BLTN7",   # Swannanoa @ Biltmore
+    "03456500": "CTON7",   # Pigeon @ Canton
+    "02151500": "BAVN7",   # Broad nr Bat Cave
+    "03512000": "BDTN7",   # Oconaluftee @ Birdtown
+    "03513000": "BRYN7",   # Tuckasegee @ Bryson City
+}
+
+NWPS_FORECAST_URL = (
+    "https://api.water.noaa.gov/nwps/v1/gauges/{lid}/stageflow/forecast"
+)
+
+
+def fetch_nwps_forecast(usgs_site_id: str, timeout: int = 15) -> dict | None:
+    """Return the official NWS NWPS stage-flow forecast for a USGS site, or
+    None if no NWS ID mapping is known or the call fails.
+
+    Output: ``{"lid": str, "issued": iso, "points": [{"t": iso, "ft": float},
+    ...], "peak_ft": float, "peak_t": iso}``.
+    """
+    lid = NWS_LID_FOR_USGS.get(usgs_site_id)
+    if not lid:
+        return None
+    try:
+        r = requests.get(
+            NWPS_FORECAST_URL.format(lid=lid),
+            timeout=timeout,
+            headers={"User-Agent": "hurricane-asheville/0.1"},
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as exc:  # noqa: BLE001
+        log.info("NWPS forecast fetch skipped (%s): %s", lid, exc)
+        return None
+
+    pts: list[dict] = []
+    for p in (data.get("data") or data.get("forecast") or []):
+        try:
+            ft = float(p.get("primary") or p.get("stage") or p.get("value"))
+            t = p.get("validTime") or p.get("time") or p.get("timestamp")
+            if t:
+                pts.append({"t": t, "ft": ft})
+        except (TypeError, ValueError):
+            continue
+
+    peak = max(pts, key=lambda x: x["ft"]) if pts else None
+    return {
+        "lid": lid,
+        "issued": data.get("issuedTime") or data.get("issued"),
+        "points": pts[:120],
+        "peak_ft": peak["ft"] if peak else None,
+        "peak_t": peak["t"] if peak else None,
+    }

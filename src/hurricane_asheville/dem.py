@@ -10,11 +10,14 @@ upslope wind component V . grad(h) along each storm track, instead of the
 """
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 
 import numpy as np
 import requests
+
+log = logging.getLogger(__name__)
 
 ELEV_API = "https://api.open-meteo.com/v1/elevation"
 
@@ -67,7 +70,7 @@ def download_dem(cache_path: str | Path = "data/dem.npz") -> Path:
     flat_lon = NN.ravel().tolist()
     elev = np.full(len(flat_lat), np.nan)
     n = len(flat_lat)
-    print(f"Downloading {n} elevation points from Open-Meteo ...")
+    log.info("Downloading %d elevation points from Open-Meteo ...", n)
     BATCH = 100
     for i in range(0, n, BATCH):
         chunk_lat = flat_lat[i:i + BATCH]
@@ -75,7 +78,7 @@ def download_dem(cache_path: str | Path = "data/dem.npz") -> Path:
         try:
             elev[i:i + BATCH] = _fetch_batch(chunk_lat, chunk_lon)
         except Exception as e:  # noqa: BLE001
-            print(f"  batch {i//BATCH} failed: {e}")
+            log.warning("DEM batch %d failed: %s", i // BATCH, e)
         time.sleep(0.6)  # gentle throttle
     missing = int(np.isnan(elev).sum())
     if missing > n // 4:
@@ -85,7 +88,7 @@ def download_dem(cache_path: str | Path = "data/dem.npz") -> Path:
         elev[np.isnan(elev)] = float(np.nanmean(elev))
     elev_grid = elev.reshape(LL.shape)
     np.savez_compressed(cache, lats=lats, lons=lons, elev=elev_grid)
-    print(f"  cached -> {cache} ({n} cells, {missing} filled)")
+    log.info("DEM cached -> %s (%d cells, %d filled)", cache, n, missing)
     return cache
 
 

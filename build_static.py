@@ -23,18 +23,32 @@ def main() -> None:
 
     client = app.test_client()
 
+    # Render the dashboard. If a transient upstream API failure causes Flask
+    # to return 500, keep any previously deployed index.html instead of
+    # failing the Pages build (which would leave the site stale anyway).
     html = client.get("/")
-    if html.status_code != 200:
-        raise SystemExit(f"render failed: HTTP {html.status_code}")
-    (out / "index.html").write_bytes(html.data)
+    if html.status_code == 200 and html.data:
+        (out / "index.html").write_bytes(html.data)
+        print(f"wrote {out / 'index.html'} ({len(html.data)} bytes)")
+    else:
+        existing = out / "index.html"
+        print(
+            f"WARNING: render returned HTTP {html.status_code}; "
+            f"{'keeping existing index.html' if existing.exists() else 'no prior index.html to fall back to'}",
+            file=sys.stderr,
+        )
+        if not existing.exists():
+            raise SystemExit(f"render failed: HTTP {html.status_code}")
 
     state = client.get("/api/state")
     if state.status_code == 200:
-        data = json.loads(state.data)
-        (out / "state.json").write_text(json.dumps(data, indent=2, default=str))
+        try:
+            data = json.loads(state.data)
+            (out / "state.json").write_text(json.dumps(data, indent=2, default=str))
+        except (ValueError, TypeError) as exc:
+            print(f"WARNING: could not serialize state.json: {exc}", file=sys.stderr)
 
     (out / ".nojekyll").write_text("")
-    print(f"wrote {out / 'index.html'} ({len(html.data)} bytes)")
 
 
 if __name__ == "__main__":
