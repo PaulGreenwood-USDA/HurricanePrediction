@@ -313,6 +313,42 @@ def cmd_ml_predict(args):
     print(_json.dumps(result, indent=2, default=str))
 
 
+def cmd_ml_backtest(args):
+    """Walk-forward backtest + write plots to site/ml/<target>/."""
+    from .backtest import backtest_and_plot
+    from .features import build_training_frame
+    from .history import load_history
+
+    df = load_history()
+    if df.empty:
+        print("No history yet. Run `ml-bootstrap` first.")
+        return
+    horizons = tuple(int(h) for h in args.horizons.split(","))
+    thresholds = (tuple(float(t) for t in args.thresholds.split(","))
+                   if args.thresholds else ())
+    frame = build_training_frame(
+        df, args.target, horizons=horizons,
+        precip_entity_id=args.precip_entity_id,
+        thresholds=thresholds,
+    )
+    if frame.empty:
+        print(f"No training frame for {args.target}.")
+        return
+    results = backtest_and_plot(
+        frame, args.target,
+        horizons=horizons, thresholds=thresholds,
+        out_dir=args.out, n_folds=args.folds,
+    )
+    for r in results:
+        label = (f"{r.kind} thr={r.threshold}" if r.threshold is not None
+                  else r.kind)
+        primary = (r.metrics.get("mae") if r.kind == "regression"
+                    else r.metrics.get("auc"))
+        print(f"  [h={r.horizon_h}h {label}] n={r.n_rows}  primary={primary}")
+    out = Path(args.out) / args.target
+    print(f"Wrote plots and summary -> {out}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hurricane-asheville",
                                 description="Hurricane risk analysis for Asheville, NC.")
@@ -405,6 +441,18 @@ def build_parser() -> argparse.ArgumentParser:
     mp.add_argument("--upstream", default="",
                      help="Comma-separated upstream gauge ids (default: auto for primary).")
     mp.set_defaults(func=cmd_ml_predict)
+
+    mbt = sub.add_parser("ml-backtest",
+                         help="Replay walk-forward folds and write plots.")
+    mbt.add_argument("--target", default="03451500")
+    mbt.add_argument("--horizons", default="6,24,72")
+    mbt.add_argument("--thresholds", default="")
+    mbt.add_argument("--precip-entity-id", default="asheville",
+                      dest="precip_entity_id")
+    mbt.add_argument("--folds", type=int, default=5)
+    mbt.add_argument("--out", default="site/ml",
+                      help="Output directory (default: site/ml).")
+    mbt.set_defaults(func=cmd_ml_backtest)
     return p
 
 

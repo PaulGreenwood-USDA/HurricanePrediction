@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import time
 import traceback
+import json
 from dataclasses import asdict
 
 from flask import Flask, jsonify, render_template_string
@@ -104,6 +105,21 @@ def _collect():
                 data["ml_forecasts"] = ml
     except Exception as exc:  # noqa: BLE001
         _log.warning("ml forecasts skipped: %s", exc)
+    # Optional ML backtest summaries (one per target) for the UI links.
+    try:
+        from pathlib import Path as _Path
+        bt_root = _Path("site/ml")
+        if bt_root.exists():
+            bt: dict = {}
+            for summary in bt_root.glob("*/summary.json"):
+                try:
+                    bt[summary.parent.name] = json.loads(summary.read_text())
+                except Exception:
+                    continue
+            if bt:
+                data["ml_backtest"] = bt
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("ml backtest summaries skipped: %s", exc)
     _CACHE["data"] = data
     _CACHE["ts"] = now
     return data
@@ -386,6 +402,32 @@ PAGE = r"""
             P(&gt;{{ c.threshold }}ft @ +{{ c.horizon_h }}h) = {{ pct }}%
           </span>
         {% endfor %}
+      </div>
+    {% endif %}
+    {% set bt = data.get('ml_backtest', {}).get(data.primary_site) %}
+    {% if bt and bt.results %}
+      <div class="dim" style="margin-top:.4rem;">
+        <b>Backtest</b>
+        {% for r in bt.results if r.kind == 'regression' and r.metrics.mae %}
+          &middot; +{{ r.horizon_h }}h MAE {{ "%.2f"|format(r.metrics.mae) }}ft
+        {% endfor %}
+        {% for r in bt.results if r.kind == 'classification' and r.metrics.auc %}
+          &middot; AUC{{ r.horizon_h }}h(&gt;{{ r.threshold }}ft) {{ "%.2f"|format(r.metrics.auc) }}
+        {% endfor %}
+        <div style="margin-top:.3rem; display:flex; gap:.4rem; flex-wrap:wrap;">
+          {% for r in bt.results %}
+            {% for label, path in r.plots.items() %}
+              <a href="ml/{{ path }}" target="_blank"
+                 style="border:1px solid #333; padding:.15rem .35rem;
+                        border-radius:.25rem; font-size:.7rem;
+                        color:var(--accent); text-decoration:none;">
+                {{ r.kind[:3] }} h{{ r.horizon_h }}
+                {% if r.threshold %}thr{{ r.threshold }}{% endif %}
+                {{ label }}
+              </a>
+            {% endfor %}
+          {% endfor %}
+        </div>
       </div>
     {% endif %}
   </div>
