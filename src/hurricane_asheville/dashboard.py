@@ -206,6 +206,19 @@ PAGE = r"""
   .stage-pill.minor  { background:#ef6c00; }
   .stage-pill.moderate { background:#c62828; }
   .stage-pill.major  { background:#6a1b9a; }
+
+  /* gauge network filter tabs */
+  .net-tabs { display:flex; flex-wrap:wrap; gap:.35rem;
+              margin:.3rem 0 .7rem 0; }
+  .net-tab { padding:.3rem .7rem; border-radius:999px; font-size:.78rem;
+             background:#11141a; color: var(--dim); cursor: pointer;
+             border:1px solid #2a2e36; user-select:none;
+             transition: all .15s ease; }
+  .net-tab:hover { color: var(--fg); border-color: var(--accent); }
+  .net-tab.active { background: var(--accent); color:#000;
+                    border-color: var(--accent); font-weight:600; }
+  .net-tab .count { opacity:.7; margin-left:.3rem; font-size:.7rem; }
+  .gauge-row.hidden { display:none; }
   .rate-up { color: #ff8a65; }
   .rate-down { color: #81c784; }
 
@@ -394,9 +407,31 @@ PAGE = r"""
   </div>
 
   <div class="card span8">
-    <h2>French Broad gauge network</h2>
+    <h2>Gauge networks</h2>
+    {% set NETWORKS = [
+        ('french_broad', 'French Broad', ['primary','upstream','headwaters','tributary']),
+        ('regional',     'WNC regional', ['regional']),
+        ('statewide',    'Statewide',    ['statewide']),
+        ('reservoirs',   'Reservoirs',   ['reservoir']),
+      ] %}
+    {% set role_to_net = {} %}
+    {% for key, label, roles in NETWORKS %}
+      {% for r in roles %}{% set _ = role_to_net.update({r: key}) %}{% endfor %}
+    {% endfor %}
+    {% set counts = {'all': data.gauges|length} %}
+    {% for key, label, roles in NETWORKS %}
+      {% set _ = counts.update({key: data.gauges | selectattr('role','in',roles) | list | length}) %}
+    {% endfor %}
+    <div class="net-tabs" id="net-tabs">
+      <span class="net-tab active" data-net="all">All<span class="count">{{ counts['all'] }}</span></span>
+      {% for key, label, roles in NETWORKS %}
+        {% if counts[key] > 0 %}
+        <span class="net-tab" data-net="{{ key }}">{{ label }}<span class="count">{{ counts[key] }}</span></span>
+        {% endif %}
+      {% endfor %}
+    </div>
     {% for g in data.gauges %}
-      <div class="gauge-row">
+      <div class="gauge-row" data-net="{{ role_to_net.get(g.role, 'other') }}">
         <div class="gauge-name">
           <b>{{ g.label }}</b>
           <span class="dim">{{ g.role }} &middot; USGS {{ g.site_id }}</span>
@@ -1016,6 +1051,24 @@ PAGE = r"""
   }
   setInterval(ageTick, 1000);
   setTimeout(() => location.reload(), 15 * 60_000);
+
+  // Gauge network filter.
+  (function() {
+    const tabs = document.querySelectorAll('#net-tabs .net-tab');
+    const rows = document.querySelectorAll('.gauge-row[data-net]');
+    function apply(net) {
+      rows.forEach(r => {
+        const show = (net === 'all') || (r.dataset.net === net);
+        r.classList.toggle('hidden', !show);
+      });
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.net === net));
+      try { localStorage.setItem('gaugeNet', net); } catch (e) {}
+    }
+    tabs.forEach(t => t.addEventListener('click', () => apply(t.dataset.net)));
+    let saved = 'all';
+    try { saved = localStorage.getItem('gaugeNet') || 'all'; } catch (e) {}
+    if ([...tabs].some(t => t.dataset.net === saved)) apply(saved);
+  })();
 </script>
 </body>
 </html>
