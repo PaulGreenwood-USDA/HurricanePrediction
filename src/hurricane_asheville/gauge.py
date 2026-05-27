@@ -44,6 +44,21 @@ UPSTREAM_GAUGES = [
     ("03456500", "Pigeon River @ Canton",              35.5326, -82.8376, "regional"),
     ("02151500", "Broad River nr Bat Cave (Lake Lure)", 35.4576, -82.2843, "regional"),
     ("03512000", "Oconaluftee @ Birdtown (Smokies)",   35.4623, -83.3457, "regional"),
+    # ---- Statewide piedmont coverage (Catawba / Yadkin / Cape Fear basins) ----
+    ("02146000", "Catawba River nr Charlotte (Mtn Is.)", 35.3409, -80.9598, "statewide"),
+    ("02118500", "Yadkin River @ Yadkin College",       35.8454, -80.3853, "statewide"),
+    ("02129000", "Pee Dee River nr Rockingham",         35.0079, -79.8703, "statewide"),
+    ("02102000", "Cape Fear River @ Lillington",        35.3979, -78.8161, "statewide"),
+    ("02105769", "Cape Fear River @ Lock 1 nr Kelly",   34.4040, -78.2980, "statewide"),
+    # ---- Coastal-plain rivers (Tar, Neuse, Lumber) — tropical flood hot zones ----
+    ("02083500", "Tar River @ Tarboro",                 35.8932, -77.5366, "statewide"),
+    ("02089000", "Neuse River @ Kinston",               35.2596, -77.5811, "statewide"),
+    ("02105500", "Lumber River @ Boardman",             34.4400, -79.0140, "statewide"),
+    # ---- Reservoir / lake stages (USACE / Duke / TVA — tropical release decisions) ----
+    ("0351706800", "Fontana Reservoir nr Fontana Dam",  35.4500, -83.8050, "reservoir"),
+    ("0208732885", "Falls Lake @ Falls Dam",            35.9395, -78.5828, "reservoir"),
+    ("02096960", "Jordan Lake @ Farrington",            35.7280, -79.0533, "reservoir"),
+    ("02143040", "Lake Norman @ Marshall Steam Plt",    35.5933, -80.9614, "reservoir"),
 ]
 
 

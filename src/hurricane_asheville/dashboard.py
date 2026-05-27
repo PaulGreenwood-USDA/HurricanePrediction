@@ -14,6 +14,7 @@ from dataclasses import asdict
 from flask import Flask, jsonify, render_template_string
 
 from .active import fetch_active_storms
+from .buoys import fetch_all_buoys
 from .config import ASHEVILLE_LAT, ASHEVILLE_LON, CSU_2026_FORECAST
 from .forests import fetch_all_forests
 from .gauge import (FLOOD_STAGES_FT, SITE_FRENCH_BROAD_ASHEVILLE,
@@ -57,6 +58,7 @@ def _collect():
     soil = _safe("soil", fetch_soil_state, {"error": "unavailable"},
                  ASHEVILLE_LAT, ASHEVILLE_LON)
     coastal = _safe("coastal", fetch_all_coastal, [])
+    buoys = _safe("buoys", fetch_all_buoys, [])
     forests = _safe("forests", fetch_all_forests, [], storms)
 
     idx = compute_index(
@@ -85,6 +87,7 @@ def _collect():
         "alerts": alerts,
         "weather": weather,
         "soil": soil,
+        "buoys": buoys,
         "coastal": coastal,
         "forests": forests,
         "season": CSU_2026_FORECAST,
@@ -485,6 +488,50 @@ PAGE = r"""
   </div>
 
   <div class="card" style="grid-column: 1 / -1;">
+    <h2>NOAA NDBC offshore buoys + C-MAN (hurricane lead-time)</h2>
+    {% if data.buoys %}
+      <table>
+        <tr>
+          <th>Station</th><th>Seas</th><th>Wave (ft / s)</th>
+          <th>Wind (kt)</th><th>Pressure (mb)</th><th>Water (&deg;F)</th>
+        </tr>
+        {% for b in data.buoys %}
+        <tr>
+          <td>
+            <b>{{ b.label }}</b>
+            <br><span class="dim" style="font-size:.7rem;">{{ b.role }} &middot; NDBC {{ b.station_id }}</span>
+          </td>
+          <td>
+            <span class="ll-pill" style="background: {{ b.color }}">{{ b.seas }}</span>
+          </td>
+          <td>
+            {% if b.wave_ht_ft is not none %}
+              {{ "%.1f"|format(b.wave_ht_ft) }} ft
+              {% if b.dominant_period_s %} / {{ "%.0f"|format(b.dominant_period_s) }} s{% endif %}
+            {% else %}?{% endif %}
+          </td>
+          <td>
+            {% if b.wind_kt is not none %}
+              {{ "%.0f"|format(b.wind_kt) }}
+              {% if b.wind_gust_kt %} (g {{ "%.0f"|format(b.wind_gust_kt) }}){% endif %}
+              {% if b.wind_dir_deg is not none %} @ {{ b.wind_dir_deg|round(0)|int }}&deg;{% endif %}
+            {% else %}?{% endif %}
+          </td>
+          <td>{{ "%.1f"|format(b.pressure_mb) if b.pressure_mb is not none else "?" }}</td>
+          <td>{{ "%.1f"|format(b.water_temp_f) if b.water_temp_f is not none else "?" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <div class="dim" style="margin-top:.4rem;">
+        Wave height &amp; long-period swell at Diamond Shoals / Frying Pan Shoals are
+        the canonical 12-24h leading indicators of a TC approaching the NC coast.
+      </div>
+    {% else %}
+      <div class="dim">NDBC feed unavailable</div>
+    {% endif %}
+  </div>
+
+  <div class="card" style="grid-column: 1 / -1;">
     <h2>NC National Forests</h2>
     <div class="forest-grid">
       {% for f in data.forests %}
@@ -673,6 +720,25 @@ PAGE = r"""
         (c.wind_dir_deg != null ? ' @ ' + Math.round(c.wind_dir_deg) + '&deg;' : '') + '<br>' +
       'Pressure: ' + (c.air_pressure_mb != null ? c.air_pressure_mb.toFixed(1) + ' mb' : 'n/a') + '<br>' +
       '<small>NOAA CO-OPS ' + c.station_id + '</small>');
+  });
+
+  // NDBC offshore buoys + C-MAN stations — hurricane lead-time markers
+  (STATE.buoys || []).forEach(b => {
+    const wave = b.wave_ht_ft || 0;
+    const radius = Math.max(5, Math.min(16, 5 + wave * 0.8));
+    L.circleMarker([b.lat, b.lon], {
+      radius, color: b.color || '#1976d2', fillColor: b.color || '#1976d2',
+      fillOpacity: .55, weight: 2,
+    }).addTo(map).bindPopup(
+      '<b>&#9883; ' + b.label + '</b><br>' +
+      'Seas: <b>' + b.seas + '</b><br>' +
+      'Wave: ' + (b.wave_ht_ft != null ? b.wave_ht_ft.toFixed(1) + ' ft' : 'n/a') +
+        (b.dominant_period_s ? ' / ' + b.dominant_period_s.toFixed(0) + ' s' : '') + '<br>' +
+      'Wind: ' + (b.wind_kt != null ? b.wind_kt.toFixed(0) + ' kt' : 'n/a') +
+        (b.wind_gust_kt ? ' (g ' + b.wind_gust_kt.toFixed(0) + ')' : '') + '<br>' +
+      'Pressure: ' + (b.pressure_mb != null ? b.pressure_mb.toFixed(1) + ' mb' : 'n/a') + '<br>' +
+      'Water: ' + (b.water_temp_f != null ? b.water_temp_f.toFixed(1) + '&deg;F' : 'n/a') + '<br>' +
+      '<small>NDBC ' + b.station_id + ' &middot; ' + b.role + '</small>');
   });
 
   // National Forests

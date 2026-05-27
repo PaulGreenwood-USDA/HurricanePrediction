@@ -38,6 +38,7 @@ def fake_state():
         "soil": {"saturated": False, "soil_moisture_top": 0.20,
                  "past_7d_precip_in": 1.2, "condition": "moist"},
         "coastal": [],
+        "buoys": [],
         "forests": [],
         "season": {"named_storms": 13, "hurricanes": 6,
                    "major_hurricanes": 3, "ace": 90,
@@ -80,7 +81,7 @@ def test_api_state_returns_json(client, fake_state):
     assert data["index"]["score"] == 42
     assert data["index"]["label"] == "ALERT"
     for key in ("gauges", "storms", "alerts", "weather",
-                "soil", "coastal", "forests", "season", "asheville"):
+                "soil", "coastal", "buoys", "forests", "season", "asheville"):
         assert key in data
 
 
@@ -102,6 +103,7 @@ def test_collect_uses_cache(monkeypatch, fake_state):
                                           "soil_moisture_top": 0.10,
                                           "past_7d_precip_in": 0.0})
     monkeypatch.setattr(dashboard, "fetch_all_coastal", lambda: [])
+    monkeypatch.setattr(dashboard, "fetch_all_buoys", lambda: [])
     monkeypatch.setattr(dashboard, "fetch_all_forests", lambda storms: [])
 
     a = dashboard._collect()
@@ -123,6 +125,7 @@ def test_collect_assembles_full_payload(monkeypatch):
                                           "soil_moisture_top": 0.20,
                                           "past_7d_precip_in": 0.5})
     monkeypatch.setattr(dashboard, "fetch_all_coastal", lambda: [])
+    monkeypatch.setattr(dashboard, "fetch_all_buoys", lambda: [])
     monkeypatch.setattr(dashboard, "fetch_all_forests", lambda storms: [])
 
     state = dashboard._collect()
