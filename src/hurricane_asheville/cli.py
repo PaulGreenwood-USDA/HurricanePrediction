@@ -238,6 +238,81 @@ def cmd_ml_features(args):
         print(f"Wrote {out}  ({out.stat().st_size/1024:.1f} KB)")
 
 
+def cmd_ml_train(args):
+    """Train LightGBM model(s) for a gauge with walk-forward backtest."""
+    from .features import build_training_frame
+    from .history import load_history
+    from .models import (default_model_path, train_with_backtest)
+
+    df = load_history()
+    if df.empty:
+        print("No history yet. Run `ml-bootstrap` first.")
+        return
+    horizons = tuple(int(h) for h in args.horizons.split(","))
+    thresholds = (tuple(float(t) for t in args.thresholds.split(","))
+                  if args.thresholds else ())
+    frame = build_training_frame(
+        df, args.target, horizons=horizons,
+        precip_entity_id=args.precip_entity_id,
+        thresholds=thresholds,
+    )
+    if frame.empty:
+        print(f"No training frame for {args.target}.")
+        return
+    print(f"Training frame: {len(frame):,} rows x {len(frame.columns)} cols")
+
+    kinds: list[tuple[str, float | None]] = []
+    if not args.classification_only:
+        kinds.append(("regression", None))
+    if thresholds:
+        for thr in thresholds:
+            kinds.append(("classification", thr))
+
+    for h in horizons:
+        for kind, thr in kinds:
+            try:
+                bundle = train_with_backtest(
+                    frame, args.target, h,
+                    kind=kind, threshold=thr, n_folds=args.folds,
+                )
+            except (ValueError, KeyError) as exc:
+                print(f"  [{kind} h{h} thr={thr}] skipped: {exc}")
+                continue
+            key = ("overall_mae" if kind == "regression"
+                   else "overall_auc")
+            primary = bundle.metrics.get(key)
+            label = (f"{kind}" if thr is None
+                     else f"{kind} thr={thr}")
+            out = default_model_path(
+                args.target,
+                f"{kind}" + (f"_thr{thr}" if thr is not None else ""),
+                h)
+            bundle.save(out)
+            print(f"  [h={h}h {label}] {key}={primary}  -> {out}")
+
+
+def cmd_ml_predict(args):
+    """Predict for the latest timestamp using a saved bundle."""
+    import json as _json
+
+    from .history import load_history
+    from .models import ModelBundle
+
+    bundle = ModelBundle.load(args.model)
+    df = load_history()
+    if df.empty:
+        print("No history yet.")
+        return
+    upstream = (args.upstream.split(",") if args.upstream else None)
+    out = bundle.__class__  # for static checkers
+    from .models import predict_latest
+
+    result = predict_latest(bundle, df,
+                              precip_entity_id=args.precip_entity_id,
+                              upstream_ids=upstream)
+    print(_json.dumps(result, indent=2, default=str))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hurricane-asheville",
                                 description="Hurricane risk analysis for Asheville, NC.")
@@ -307,6 +382,29 @@ def build_parser() -> argparse.ArgumentParser:
     mf.add_argument("--dropna-features", action="store_true",
                      dest="dropna_features")
     mf.set_defaults(func=cmd_ml_features)
+
+    mt = sub.add_parser("ml-train",
+                        help="Train LightGBM models with walk-forward backtest.")
+    mt.add_argument("--target", default="03451500")
+    mt.add_argument("--horizons", default="6,24,72")
+    mt.add_argument("--thresholds", default="",
+                     help="Comma-separated stage thresholds for classification heads.")
+    mt.add_argument("--precip-entity-id", default="asheville",
+                     dest="precip_entity_id")
+    mt.add_argument("--folds", type=int, default=5)
+    mt.add_argument("--classification-only", action="store_true",
+                     dest="classification_only")
+    mt.set_defaults(func=cmd_ml_train)
+
+    mp = sub.add_parser("ml-predict",
+                        help="Predict for the latest snapshot using a saved bundle.")
+    mp.add_argument("--model", required=True,
+                     help="Path to a .joblib bundle (sidecar .json must exist).")
+    mp.add_argument("--precip-entity-id", default="asheville",
+                     dest="precip_entity_id")
+    mp.add_argument("--upstream", default="",
+                     help="Comma-separated upstream gauge ids (default: auto for primary).")
+    mp.set_defaults(func=cmd_ml_predict)
     return p
 
 
