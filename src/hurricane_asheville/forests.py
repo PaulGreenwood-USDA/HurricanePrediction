@@ -57,6 +57,46 @@ FOREST_GAUGES: dict[str, tuple[tuple[str, str, float, float, str], ...]] = {
 }
 
 
+# USDA Forest Service Ranger District offices. Coordinates are the public
+# district-office addresses (close enough to the district's geographic
+# population centroid for weather/alerts/AQI/fire-weather purposes).
+# Each tuple: (district_name, office_city, lat, lon, notes)
+DISTRICT_OFFICES: dict[str, tuple[tuple[str, str, float, float, str], ...]] = {
+    "Pisgah": (
+        ("Appalachian", "Burnsville",
+         35.9170, -82.3000,
+         "Black Mtns, Mt. Mitchell, Roan Mtn; steep slopes + frequent rime."),
+        ("Grandfather", "Nebo",
+         35.7380, -81.9430,
+         "Linville Gorge, Wilson Creek wilderness; landslide-prone slopes."),
+        ("Pisgah", "Pisgah Forest",
+         35.2900, -82.7120,
+         "Brevard / DuPont edge; Davidson + French Broad headwaters."),
+    ),
+    "Nantahala": (
+        ("Cheoah", "Robbinsville",
+         35.3230, -83.8060,
+         "Joyce Kilmer Memorial Forest, Cheoah & Santeetlah lakes."),
+        ("Nantahala", "Franklin",
+         35.1820, -83.3820,
+         "Nantahala Gorge, Standing Indian; high orographic precip."),
+        ("Tusquitee", "Murphy",
+         35.0900, -84.0300,
+         "Hiwassee, Shooting Creek; SW corner of NC."),
+    ),
+    "Uwharrie": (
+        ("Uwharrie", "Troy",
+         35.3580, -79.8910,
+         "Single district; OHV trails, ancient Uwharrie Mtns."),
+    ),
+    "Croatan": (
+        ("Croatan", "New Bern",
+         34.9400, -77.0400,
+         "Single district; pocosin wetlands between Neuse and White Oak."),
+    ),
+}
+
+
 @dataclass(frozen=True)
 class NationalForest:
     name: str
@@ -158,6 +198,50 @@ def _gauges_for(forest_short: str) -> list[dict]:
         return list(pool.map(_one, entries))
 
 
+def _districts_for(forest: NationalForest,
+                    active_fires: list | None) -> list[dict]:
+    """Pull live weather / alerts / AQI / fire-weather / landslide for every
+    ranger district office in this forest, in parallel.
+
+    Per-district payload is intentionally lighter than the forest-level call:
+    no USGS gauges (those are forest-scope), no landslide inventory lookup
+    (one ArcGIS hit per forest is enough — we only want hazard *score* per
+    district), so we can fan out across 1–3 districts cheaply.
+    """
+    entries = DISTRICT_OFFICES.get(forest.short, ())
+    if not entries:
+        return []
+
+    def _one(entry):
+        name, office, lat, lon, notes = entry
+        weather = fetch_current_weather(lat, lon)
+        alerts = fetch_nws_alerts(lat, lon)
+        soil = fetch_soil_state(lat, lon)
+        air = fetch_air_quality(lat, lon)
+        landslide = compute_landslide_hazard(forest.region, soil, weather)
+        # Skip per-district inventory fetch — heavy and changes slowly.
+        landslide["inventory"] = {"count": 0}
+        fire_wx = compute_fire_weather(weather, alerts, forest.region)
+        nearby_fires = fires_near(lat, lon, active_fires or [], radius_mi=25.0)
+        return {
+            "name": name,
+            "office": office,
+            "lat": lat,
+            "lon": lon,
+            "notes": notes,
+            "weather": weather,
+            "alerts": alerts,
+            "soil": soil,
+            "air_quality": air,
+            "landslide": landslide,
+            "fire_weather": fire_wx,
+            "fires_summary": summarize_fires(nearby_fires),
+        }
+
+    with ThreadPoolExecutor(max_workers=min(4, len(entries))) as pool:
+        return list(pool.map(_one, entries))
+
+
 def fetch_forest_state(forest: NationalForest,
                         active_storms: list | None = None,
                         active_fires: list | None = None,
@@ -184,6 +268,8 @@ def fetch_forest_state(forest: NationalForest,
                               active_fires or [], radius_mi=50.0)
     fires_summary = summarize_fires(nearby_fires)
 
+    districts_data = _districts_for(forest, active_fires)
+
     nearest_storm = None
     nearest_mi = None
     if active_storms:
@@ -202,6 +288,7 @@ def fetch_forest_state(forest: NationalForest,
         "established": forest.established,
         "hq_city": forest.hq_city,
         "center_lat": forest.center_lat,
+        "districts_data": districts_data,
         "center_lon": forest.center_lon,
         "districts": list(forest.districts),
         "region": forest.region,

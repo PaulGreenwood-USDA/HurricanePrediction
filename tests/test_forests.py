@@ -82,6 +82,14 @@ def test_fetch_forest_state_uses_mocked_apis(monkeypatch, fake_response,
     assert state["fire_weather"]["label"] in {"CALM", "ELEVATED", "HIGH", "EXTREME"}
     assert state["air_quality"]["us_aqi"] == 42
     assert state["fires_summary"]["count"] == 0
+    # New: per-district breakdown
+    assert len(state["districts_data"]) == 3   # Pisgah has 3 ranger districts
+    d0 = state["districts_data"][0]
+    assert {"name", "office", "lat", "lon", "weather", "alerts",
+            "air_quality", "landslide", "fire_weather",
+            "fires_summary"} <= set(d0)
+    assert d0["fire_weather"]["label"] in {"CALM", "ELEVATED", "HIGH", "EXTREME"}
+    assert d0["air_quality"]["us_aqi"] == 42
 
 
 def test_fetch_forest_nearest_storm_distance(monkeypatch, fake_response,
@@ -150,3 +158,16 @@ def test_per_forest_gauges_are_in_nc():
             assert -85.0 < lon < -75.0, f"{site_id} lon out of NC: {lon}"
             assert role in {"primary", "tributary", "headwaters",
                             "regional", "upstream"}, role
+
+
+def test_district_offices_cover_every_named_district():
+    """Every district named on a NationalForest has an office in DISTRICT_OFFICES."""
+    from hurricane_asheville.forests import DISTRICT_OFFICES
+    for f in NC_NATIONAL_FORESTS:
+        offices = {entry[0] for entry in DISTRICT_OFFICES.get(f.short, ())}
+        assert offices == set(f.districts), (
+            f"{f.short}: districts {f.districts} vs offices {offices}")
+        for name, office, lat, lon, notes in DISTRICT_OFFICES[f.short]:
+            assert 33.5 < lat < 37.0, f"{f.short}/{name} lat out of NC: {lat}"
+            assert -85.0 < lon < -75.0, f"{f.short}/{name} lon out of NC: {lon}"
+            assert office and notes

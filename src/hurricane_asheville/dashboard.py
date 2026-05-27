@@ -208,6 +208,25 @@ PAGE = r"""
   .forest-gauge:last-child { border-bottom: 0; }
   .fg-name { color: var(--dim); }
   .fg-stage { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  .districts { margin-top:.6rem; padding-top:.5rem;
+               border-top: 1px dashed #2a2e36; display:grid; gap:.4rem;
+               grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .district { background:#11141a; border-radius:6px; padding:.45rem .6rem;
+              border-left: 3px solid #4fc3f7; }
+  .district h4 { margin:0 0 .15rem 0; font-size:.82rem; }
+  .district .d-meta { font-size:.68rem; color: var(--dim);
+                      margin-bottom:.35rem; }
+  .district .d-stats { display:grid; grid-template-columns: auto 1fr;
+                       gap:.1rem .5rem; font-size:.74rem; }
+  .district .d-stats span:nth-child(odd) { color: var(--dim); }
+  .district .d-pills { display:flex; flex-wrap:wrap; gap:.25rem;
+                       margin-top:.35rem; }
+  .d-pill { padding:.1rem .4rem; border-radius:999px; font-size:.66rem;
+            font-weight:700; color:#fff; letter-spacing:.04em;
+            text-transform:uppercase; }
+  .district .d-notes { font-size:.66rem; color: var(--dim); margin-top:.3rem;
+                       font-style: italic; }
 </style>
 </head>
 <body>
@@ -556,6 +575,58 @@ PAGE = r"""
             <span class="storm-near">!! TC within 300 mi !!</span>
           {% endif %}
           <div class="dim" style="margin-top:.4rem; font-size:.74rem;">{{ f.notes }}</div>
+
+          {% if f.districts_data %}
+            <div class="ll-section-title" style="margin-top:.6rem;">Ranger districts</div>
+            <div class="districts">
+              {% for d in f.districts_data %}
+                <div class="district">
+                  <h4>{{ d.name }} RD</h4>
+                  <div class="d-meta">Office: {{ d.office }}</div>
+                  <div class="d-stats">
+                    {% if d.weather and not d.weather.error %}
+                      <span>Temp</span><span>{{ d.weather.temp_f }}&deg;F</span>
+                      <span>72h precip</span><span><b>{{ d.weather.next_72h_precip_in }} in</b></span>
+                      <span>Wind</span><span>{{ d.weather.wind_mph }} mph</span>
+                      <span>RH</span><span>{{ d.weather.humidity_pct }}%</span>
+                    {% else %}
+                      <span>Weather</span><span class="dim">unavailable</span>
+                    {% endif %}
+                  </div>
+                  <div class="d-pills">
+                    {% if d.landslide %}
+                      <span class="d-pill" style="background: {{ d.landslide.color }}"
+                            title="{{ d.landslide.explain }}">
+                        Slide {{ d.landslide.label }} ({{ d.landslide.score }})
+                      </span>
+                    {% endif %}
+                    {% if d.fire_weather %}
+                      <span class="d-pill" style="background: {{ d.fire_weather.color }}"
+                            title="{{ d.fire_weather.explain }}">
+                        Fire {{ d.fire_weather.label }} ({{ d.fire_weather.score }})
+                      </span>
+                    {% endif %}
+                    {% if d.air_quality and not d.air_quality.error and d.air_quality.us_aqi is not none %}
+                      <span class="d-pill" style="background: {{ d.air_quality.color }}">
+                        AQI {{ d.air_quality.label }} ({{ d.air_quality.us_aqi|int }})
+                      </span>
+                    {% endif %}
+                    {% if d.fires_summary and d.fires_summary.count %}
+                      <span class="d-pill" style="background:#ff3d00">
+                        {{ d.fires_summary.count }} fire{{ '' if d.fires_summary.count == 1 else 's' }}
+                      </span>
+                    {% endif %}
+                    {% if d.alerts %}
+                      <span class="d-pill" style="background:#b71c1c">
+                        {{ d.alerts|length }} alert{{ '' if d.alerts|length == 1 else 's' }}
+                      </span>
+                    {% endif %}
+                  </div>
+                  <div class="d-notes">{{ d.notes }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
@@ -634,6 +705,22 @@ PAGE = r"""
           Math.round(f.nearest_storm_mi) + ' mi<br>'
         : '') +
       '<small>' + f.notes + '</small>');
+    (f.districts_data || []).forEach(d => {
+      L.circleMarker([d.lat, d.lon], {
+        radius: 4, color: c, fillColor: '#fff', fillOpacity: .9, weight: 2,
+      }).addTo(map).bindPopup(
+        '<b>' + d.name + ' RD</b> &middot; ' + f.short + ' NF<br>' +
+        'Office: ' + d.office + '<br>' +
+        (d.weather && !d.weather.error
+          ? 'Temp: ' + d.weather.temp_f + '&deg;F &middot; 72h precip: ' +
+            d.weather.next_72h_precip_in + ' in<br>'
+          : '') +
+        (d.fire_weather ? 'Fire wx: <b>' + d.fire_weather.label + '</b> (' +
+          d.fire_weather.score + ')<br>' : '') +
+        (d.landslide ? 'Landslide: <b>' + d.landslide.label + '</b> (' +
+          d.landslide.score + ')<br>' : '') +
+        '<small>' + d.notes + '</small>');
+    });
   });
 
   STATE.gauges.forEach(g => {
