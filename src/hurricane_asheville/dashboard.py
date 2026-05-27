@@ -120,6 +120,14 @@ def _collect():
                 data["ml_backtest"] = bt
     except Exception as exc:  # noqa: BLE001
         _log.warning("ml backtest summaries skipped: %s", exc)
+
+    # Narrative TL;DR + glossary (always cheap, always populated).
+    try:
+        from .narrative import GLOSSARY, summarize
+        data["narrative"] = summarize(data)
+        data["glossary"] = GLOSSARY
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("narrative skipped: %s", exc)
     _CACHE["data"] = data
     _CACHE["ts"] = now
     return data
@@ -257,6 +265,42 @@ PAGE = r"""
             text-transform:uppercase; }
   .district .d-notes { font-size:.66rem; color: var(--dim); margin-top:.3rem;
                        font-style: italic; }
+
+  /* --- Phase 6: TL;DR hero + jargon tooltips + compact triggers --- */
+  .hero { grid-column: span 12; padding: 1.4rem 1.6rem;
+          border-left: 8px solid var(--hero-color, #2e7d32); }
+  .hero .level { display:inline-block; padding:.25rem .8rem;
+                  border-radius:999px; font-size:.7rem; font-weight:800;
+                  letter-spacing:.18em; text-transform:uppercase;
+                  color:#fff; }
+  .hero h2.headline { margin:.6rem 0 .2rem 0; font-size:1.45rem;
+                       font-weight:700; color:#fff; text-transform:none;
+                       letter-spacing:0; }
+  .hero .sub { color: var(--dim); font-size:.92rem; margin-bottom:.6rem; }
+  .hero .rec { background:#11141a; border-radius:6px; padding:.5rem .8rem;
+                font-size:.9rem; line-height:1.4; }
+  .hero .facts { margin-top:.7rem; display:grid; gap:.3rem;
+                  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .hero .fact { background:#11141a; border-radius:6px;
+                 padding:.4rem .6rem; font-size:.82rem; }
+  .hero .fact b { color: var(--accent); }
+
+  /* tooltip on jargon: dotted underline + native title= */
+  .jargon { border-bottom: 1px dotted var(--dim); cursor: help; }
+
+  /* compact triggers row: fired ones bright, off ones muted */
+  .trig-strip { display:flex; flex-wrap:wrap; gap:.35rem; }
+  .trig { padding:.25rem .55rem; border-radius:999px; font-size:.74rem;
+          background:#11141a; color: var(--dim);
+          border:1px solid #2a2e36; }
+  .trig.on { background:#7f1d1d; color:#fff; border-color:#7f1d1d;
+             font-weight:600; }
+
+  /* legend / 'how to read' card */
+  .legend dt { font-weight:600; color: var(--accent);
+                margin-top:.5rem; font-size:.85rem; }
+  .legend dd { margin:.1rem 0 .4rem 0; color: var(--dim);
+                font-size:.82rem; line-height:1.4; }
 </style>
 </head>
 <body>
@@ -269,8 +313,23 @@ PAGE = r"""
 
 <div class="grid">
 
+  {% set n = data.get('narrative') %}
+  {% if n %}
+  <div class="card hero" style="--hero-color: {{ n.color }};">
+    <span class="level" style="background: {{ n.color }};">{{ n.level }}</span>
+    <h2 class="headline">{{ n.headline }}</h2>
+    <div class="sub">{{ n.subheadline }}</div>
+    <div class="rec">{{ n.recommendation }}</div>
+    {% if n.key_facts %}
+    <div class="facts">
+      {% for f in n.key_facts %}<div class="fact">{{ f }}</div>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="card span6">
-    <h2>Asheville Flood Index</h2>
+    <h2><span class="jargon" title="{{ data.glossary['Flood Index'] }}">Asheville Flood Index</span></h2>
     <div class="dial-wrap">
       <svg class="dial" viewBox="0 0 120 120">
         <circle cx="60" cy="60" r="52" fill="none" stroke="#2a2e36" stroke-width="12"/>
@@ -306,24 +365,31 @@ PAGE = r"""
 
   <div class="card span6">
     <h2>Triggers</h2>
-    <div class="lights">
-      {% set names = [
-        ('stage_above_action','River >= action stage'),
-        ('stage_above_minor','River >= minor flood'),
-        ('qpf_over_1in','72h QPF >= 1 in'),
-        ('qpf_over_3in','72h QPF >= 3 in'),
+    <div class="dim" style="margin-bottom:.4rem; font-size:.78rem;">
+      Discrete risk conditions. Bright pills are currently firing.
+    </div>
+    {% set names = [
+        ('stage_above_action','River \u2265 action stage'),
+        ('stage_above_minor','River \u2265 minor flood'),
+        ('qpf_over_1in','72h QPF \u2265 1 in'),
+        ('qpf_over_3in','72h QPF \u2265 3 in'),
         ('storm_within_1000mi','TC within 1000 mi'),
         ('storm_within_500mi','TC within 500 mi'),
         ('river_rising_fast','River rising > 0.3 ft/hr'),
         ('nws_flood_or_tropical','NWS flood/tropical alert'),
         ('soil_saturated','Soil saturated'),
-        ('wet_week','Past 7d precip >= 3 in'),
+        ('wet_week','Past 7d precip \u2265 3 in'),
       ] %}
-      {% for k,label in names %}
-        <div class="light {{ 'on' if data.index.triggers[k] else 'off' }}">
-          <span class="led"></span>{{ label }}
-        </div>
-      {% endfor %}
+    {# sort: fired first, then dormant #}
+    {% set fired = [] %}
+    {% set dormant = [] %}
+    {% for k,label in names %}
+      {% if data.index.triggers[k] %}{% set _ = fired.append((k,label)) %}
+      {% else %}{% set _ = dormant.append((k,label)) %}{% endif %}
+    {% endfor %}
+    <div class="trig-strip">
+      {% for k,label in fired %}<span class="trig on">{{ label }}</span>{% endfor %}
+      {% for k,label in dormant %}<span class="trig">{{ label }}</span>{% endfor %}
     </div>
   </div>
 
@@ -749,6 +815,30 @@ PAGE = r"""
     </div>
   </div>
 
+  {% if data.glossary %}
+  <div class="card span12 legend">
+    <h2>How to read this dashboard</h2>
+    <div class="dim" style="margin-bottom:.5rem; font-size:.78rem;">
+      Plain-English definitions for the jargon on this page. Hover any
+      <span class="jargon" title="Like this. Hover to read.">dotted term</span>
+      for a quick tip.
+    </div>
+    <dl style="column-count: 2; column-gap: 1.5rem;">
+      {% for term in [
+          'Flood Index','QPF','stage','action stage','minor flood',
+          'moderate flood','major flood','discharge','rate',
+          'NWPS forecast','ML forecast','backtest','MAE','AUC',
+          'soil saturated','TC','ETA',
+        ] %}
+        {% if data.glossary.get(term) %}
+        <dt>{{ term }}</dt>
+        <dd>{{ data.glossary[term] }}</dd>
+        {% endif %}
+      {% endfor %}
+    </dl>
+  </div>
+  {% endif %}
+
 </div>
 
 <footer>
@@ -934,7 +1024,11 @@ PAGE = r"""
 
 @app.route("/")
 def index():
-    return render_template_string(PAGE, data=_collect())
+    from .narrative import GLOSSARY, summarize
+    data = _collect()
+    data.setdefault("glossary", GLOSSARY)
+    data.setdefault("narrative", summarize(data))
+    return render_template_string(PAGE, data=data)
 
 
 @app.route("/api/state")
