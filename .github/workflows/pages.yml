@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read   # history commit is now in the commit-history job
+  contents: write
   pages: write
   id-token: write
 
@@ -24,62 +24,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-
       - name: Set up uv
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
 
-      # Run tests before building so a broken commit never produces a bad deploy.
-      # Failures here block deploy but do NOT cancel the hourly schedule —
-      # the next hourly run will retry automatically.
       - name: Run tests
         run: uv run pytest -q
 
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Build static site
-        run: uv run python build_static.py
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          artifact_name: github-pages
-
-  commit-history:
-    # Run after deploy so the history push never changes master HEAD before
-    # the Pages API validates the build version against the branch SHA.
-    needs: deploy
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-
-      - name: Rebuild history snapshot
         run: uv run python build_static.py
 
       - name: Commit appended history partition
@@ -93,3 +49,19 @@ jobs:
           else
             echo "no history change to commit"
           fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
