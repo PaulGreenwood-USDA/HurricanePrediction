@@ -8,36 +8,46 @@ on:
     - cron: "17 * * * *"
   workflow_dispatch:
 
+# Minimal default; each job grants only what it needs.
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
-# Allow only one concurrent deployment; cancel in-progress runs that aren't done yet
+# Only one Pages deploy at a time; never cancel an in-progress deploy.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
-          python-version: "3.12"
-          cache: pip
+          enable-cache: true
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+      - name: Run tests
+        run: uv run pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push the history snapshot commit
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
       - name: Build static site
-        run: python build_static.py
+        run: uv run python build_static.py
 
       - name: Commit appended history partition
         run: |
@@ -59,6 +69,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

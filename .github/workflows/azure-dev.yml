@@ -5,6 +5,15 @@ on:
   push:
     branches:
       - main
+    # Skip Azure deploy when only docs, data snapshots, or the Pages site change.
+    paths:
+      - "src/**"
+      - "infra/**"
+      - "azure.yaml"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "wsgi.py"
 
 # Required for federated OIDC login to Azure
 permissions:
@@ -12,8 +21,23 @@ permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  test:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Run tests
+        run: uv run pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
     env:
       AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
@@ -22,24 +46,20 @@ jobs:
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install azd
         uses: Azure/setup-azd@v2
 
       - name: Log in with azd (federated credential)
         run: |
-          azd auth login `
-            --client-id "$Env:AZURE_CLIENT_ID" `
-            --federated-credential-provider "github" `
-            --tenant-id "$Env:AZURE_TENANT_ID"
-        shell: pwsh
+          azd auth login \
+            --client-id "$AZURE_CLIENT_ID" \
+            --federated-credential-provider "github" \
+            --tenant-id "$AZURE_TENANT_ID"
 
       - name: Provision infrastructure
         run: azd provision --no-prompt
-        shell: pwsh
 
       - name: Deploy application
         run: azd deploy --no-prompt
-        shell: pwsh

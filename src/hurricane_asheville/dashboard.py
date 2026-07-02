@@ -324,6 +324,166 @@ PAGE = r"""
     font-weight: 600;
   }
 
+  /* ── ML Forecast card ──────────────────────────────────────────── */
+  .ml-grid {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin-top: .75rem;
+  }
+
+  .ml-horizon {
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: .75rem .9rem;
+    border-top: 3px solid var(--accent);
+  }
+
+  .h-label {
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: .3rem;
+  }
+
+  .h-stage {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .h-stage small {
+    font-size: .85rem;
+    font-weight: 400;
+    color: var(--dim);
+    margin-left: .15rem;
+  }
+
+  .h-delta {
+    font-size: .78rem;
+    margin-top: .3rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .h-delta.up   { color: #ff8a65; }
+  .h-delta.down { color: #81c784; }
+  .h-delta.flat { color: var(--dim); }
+
+  /* flood-stage progress bar */
+  .ml-bar {
+    position: relative;
+    height: 10px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #11141a;
+    margin-top: .6rem;
+  }
+
+  .ml-bar .band {
+    position: absolute;
+    top: 0; bottom: 0;
+    opacity: .55;
+  }
+
+  .ml-bar .band.action   { background: #9e9d24; }
+  .ml-bar .band.minor    { background: #ef6c00; }
+  .ml-bar .band.moderate { background: #c62828; }
+  .ml-bar .band.major    { background: #6a1b9a; }
+
+  .ml-bar .now,
+  .ml-bar .pred {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    transform: translateX(-1px);
+  }
+
+  .ml-bar .now  { background: rgba(255,255,255,.45); }
+  .ml-bar .pred { background: #fff; box-shadow: 0 0 4px #fff; }
+  .ml-bar.high .pred { background: #ef5350; box-shadow: 0 0 4px #ef5350; }
+
+  .ml-bar-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: .6rem;
+    color: var(--dim);
+    margin-top: .25rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* probability section */
+  .ml-probs {
+    margin-top: 1rem;
+    padding-top: .75rem;
+    border-top: 1px solid #2a2e36;
+    display: grid;
+    gap: .5rem;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+
+  .ml-prob {
+    background: var(--panel2);
+    border-radius: 6px;
+    padding: .55rem .7rem;
+    font-size: .8rem;
+  }
+
+  .pbar {
+    height: 8px;
+    background: #11141a;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: .35rem 0 .25rem;
+  }
+
+  .pbar .fill {
+    height: 100%;
+    border-radius: 4px;
+    min-width: 3px;
+  }
+
+  .pct {
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .pct.high { color: #ef5350; }
+  .pct.med  { color: #fb8c00; }
+  .pct.low  { color: #7cb342; }
+
+  /* backtest plot links */
+  .ml-meta {
+    margin-top: .75rem;
+    padding-top: .6rem;
+    border-top: 1px solid #2a2e36;
+    font-size: .78rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    align-items: center;
+  }
+
+  .ml-plot-link {
+    display: inline-block;
+    padding: .2rem .55rem;
+    border-radius: 4px;
+    background: #11141a;
+    border: 1px solid #2a2e36;
+    color: var(--accent);
+    font-size: .73rem;
+    text-decoration: none;
+  }
+
+  .ml-plot-link:hover {
+    border-color: var(--accent);
+    background: #1a1d24;
+  }
+
   /* compact triggers row: fired ones bright, off ones muted */
   .trig-strip { display:flex; flex-wrap:wrap; gap:.35rem; }
   .trig { padding:.25rem .55rem; border-radius:999px; font-size:.74rem;
