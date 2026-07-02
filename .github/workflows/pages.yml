@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # history snapshot commit
+  contents: read   # history commit is now in the commit-history job
   pages: write
   id-token: write
 
@@ -41,18 +41,6 @@ jobs:
       - name: Build static site
         run: uv run python build_static.py
 
-      - name: Commit appended history partition
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain data/history)" ]; then
-            git add data/history
-            git commit -m "history: hourly snapshot $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
-            git push
-          else
-            echo "no history change to commit"
-          fi
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
@@ -73,3 +61,35 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: github-pages
+
+  commit-history:
+    # Run after deploy so the history push never changes master HEAD before
+    # the Pages API validates the build version against the branch SHA.
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Rebuild history snapshot
+        run: uv run python build_static.py
+
+      - name: Commit appended history partition
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain data/history)" ]; then
+            git add data/history
+            git commit -m "history: hourly snapshot $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+            git push
+          else
+            echo "no history change to commit"
+          fi
