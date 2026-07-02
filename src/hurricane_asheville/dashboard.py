@@ -538,7 +538,7 @@ PAGE = r"""
     text-transform: uppercase;
     margin-bottom: .3rem;
   }
-  .heat-spark { height: 52px; width: 100%; display: block; }
+  .heat-spark { height: 68px; width: 100%; display: block; }
   .heat-spark-legend {
     display: flex;
     gap: 1rem;
@@ -935,16 +935,39 @@ PAGE = r"""
       {% set vmin = _all | min - 2 %}
       {% set vmax = _all | max + 2 %}
       {% set vrng = (vmax - vmin) if (vmax - vmin) > 0.1 else 0.1 %}
-      <svg class="heat-spark" viewBox="0 0 200 52" preserveAspectRatio="none">
+      {% set times = w.hourly_times %}
+      <svg class="heat-spark" viewBox="0 0 200 68" preserveAspectRatio="none">
+        {# chart area is rows 0-50; label area is rows 52-68 #}
+        {# horizontal baseline #}
+        <line x1="0" y1="51" x2="200" y2="51" stroke="#2a2e36" stroke-width="0.5"/>
+        {# tick marks + hour labels every 6 points (0, 6, 12, 18, 23) #}
+        {% for i in [0, 6, 12, 18] + ([n - 1] if (n - 1) % 6 != 0 else []) %}
+          {% if i < n %}
+            {% set x = (i / (n - 1)) * 200 %}
+            {% set hr = '' %}
+            {% if times and i < times | length %}
+              {% set hr = times[i][-5:-3] %}
+            {% else %}
+              {% set hr = i | string %}
+            {% endif %}
+            <line x1="{{ '%.1f' | format(x) }}" y1="51"
+                  x2="{{ '%.1f' | format(x) }}" y2="54"
+                  stroke="#9aa0aa" stroke-width="0.5"/>
+            <text x="{{ '%.1f' | format(x) }}" y="63"
+                  text-anchor="{% if i == 0 %}start{% elif i >= n - 2 %}end{% else %}middle{% endif %}"
+                  font-size="7" fill="#9aa0aa">{{ hr }}h</text>
+          {% endif %}
+        {% endfor %}
+        {# temp lines #}
         {% set pts = [] %}
         {% for v in ht %}
-          {% set _ = pts.append("%.1f,%.1f" | format((loop.index0 / (n - 1)) * 200, 50 - ((v - vmin) / vrng) * 48)) %}
+          {% set _ = pts.append("%.1f,%.1f" | format((loop.index0 / (n - 1)) * 200, 49 - ((v - vmin) / vrng) * 47)) %}
         {% endfor %}
         <polyline points="{{ pts | join(' ') }}" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>
         {% set pts2 = [] %}
         {% set n2 = ha | length %}
         {% for v in ha %}
-          {% set _ = pts2.append("%.1f,%.1f" | format((loop.index0 / (n2 - 1)) * 200, 50 - ((v - vmin) / vrng) * 48)) %}
+          {% set _ = pts2.append("%.1f,%.1f" | format((loop.index0 / (n2 - 1)) * 200, 49 - ((v - vmin) / vrng) * 47)) %}
         {% endfor %}
         <polyline points="{{ pts2 | join(' ') }}" fill="none" stroke="#ff8a65" stroke-width="1.5" stroke-dasharray="4,2"/>
       </svg>
