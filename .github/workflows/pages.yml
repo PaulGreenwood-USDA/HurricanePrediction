@@ -41,6 +41,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v4
         with:
