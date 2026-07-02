@@ -484,6 +484,82 @@ PAGE = r"""
     background: #1a1d24;
   }
 
+  /* ── Heat stress & wet-bulb card ─────────────────────────────── */
+  .heat-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+    margin-top: .6rem;
+    align-items: start;
+  }
+  .heat-index-block {
+    text-align: center;
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: .9rem 1.1rem;
+    min-width: 120px;
+  }
+  .heat-index-num {
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .heat-cat-badge {
+    display: inline-block;
+    margin-top: .4rem;
+    padding: .2rem .65rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .heat-metrics { display: grid; gap: .25rem; }
+  .heat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: .3rem .55rem;
+    background: var(--panel2);
+    border-radius: 6px;
+    font-size: .88rem;
+  }
+  .heat-row b { font-variant-numeric: tabular-nums; }
+  .heat-sparkline {
+    margin-top: .8rem;
+    padding-top: .65rem;
+    border-top: 1px solid #2a2e36;
+  }
+  .heat-spark-title {
+    font-size: .65rem;
+    color: var(--dim);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: .3rem;
+  }
+  .heat-spark { height: 52px; width: 100%; display: block; }
+  .heat-spark-legend {
+    display: flex;
+    gap: 1rem;
+    font-size: .68rem;
+    color: var(--dim);
+    margin-top: .25rem;
+  }
+  .heat-spark-legend .leg-actual::before { content: '\2014\00a0'; color: #4fc3f7; }
+  .heat-spark-legend .leg-app::before    { content: '\2013\00a0'; color: #ff8a65; }
+  .heat-nws-cats {
+    margin-top: .8rem;
+    padding-top: .65rem;
+    border-top: 1px solid #2a2e36;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem .9rem;
+    font-size: .72rem;
+  }
+  .heat-nws-cat { display: flex; align-items: center; gap: .35rem; }
+  .heat-nws-swatch { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 10px; }
+
   /* compact triggers row: fired ones bright, off ones muted */
   .trig-strip { display:flex; flex-wrap:wrap; gap:.35rem; }
   .trig { padding:.25rem .55rem; border-radius:999px; font-size:.74rem;
@@ -814,6 +890,87 @@ PAGE = r"""
       <div class="dim">Open-Meteo &middot; {{ data.weather.as_of }}</div>
     {% else %}
       <div class="dim">Weather feed unavailable</div>
+    {% endif %}
+  </div>
+
+  <div class="card span8">
+    <h2>Heat stress &amp; wet-bulb
+      <span class="ml-subtitle">
+        <span>NWS heat index</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span>Stull wet-bulb</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span class="site-chip">Asheville</span>
+      </span>
+    </h2>
+    {% set w = data.weather %}
+    {% if w and not w.error and w.heat_index_f is not none %}
+    <div class="heat-grid">
+      <div class="heat-index-block">
+        <div class="dim" style="font-size:.63rem; letter-spacing:.1em; text-transform:uppercase; margin-bottom:.2rem;">Heat Index</div>
+        <div class="heat-index-num" style="color: {{ w.heat_color }};">{{ w.heat_index_f }}&deg;</div>
+        <div class="heat-cat-badge" style="background: {{ w.heat_color }};">{{ w.heat_category }}</div>
+      </div>
+      <div class="heat-metrics">
+        <div class="heat-row"><span>Actual temp</span><b>{{ w.temp_f }}&deg;F</b></div>
+        {% if w.apparent_temp_f is not none %}
+        <div class="heat-row"><span>Feels like</span><b>{{ w.apparent_temp_f }}&deg;F</b></div>
+        {% endif %}
+        {% if w.wet_bulb_f is not none %}
+        <div class="heat-row"><span><span class="jargon" title="Lowest temperature achievable by evaporative cooling; key heat-stress indicator.">Wet-bulb temp</span></span><b>{{ w.wet_bulb_f }}&deg;F</b></div>
+        {% endif %}
+        {% if w.dew_point_f is not none %}
+        <div class="heat-row"><span>Dew point</span><b>{{ w.dew_point_f }}&deg;F</b></div>
+        {% endif %}
+        <div class="heat-row"><span>Relative humidity</span><b>{{ w.humidity_pct }}%</b></div>
+      </div>
+    </div>
+    {% set ht = w.hourly_temp_f %}
+    {% set ha = w.hourly_apparent_f %}
+    {% if ht and ha and ht | length > 1 %}
+    <div class="heat-sparkline">
+      <div class="heat-spark-title">24-hour temperature forecast</div>
+      {% set n = ht | length %}
+      {% set _all = ht + ha %}
+      {% set vmin = _all | min - 2 %}
+      {% set vmax = _all | max + 2 %}
+      {% set vrng = (vmax - vmin) if (vmax - vmin) > 0.1 else 0.1 %}
+      <svg class="heat-spark" viewBox="0 0 200 52" preserveAspectRatio="none">
+        {% set pts = [] %}
+        {% for v in ht %}
+          {% set _ = pts.append("%.1f,%.1f" | format((loop.index0 / (n - 1)) * 200, 50 - ((v - vmin) / vrng) * 48)) %}
+        {% endfor %}
+        <polyline points="{{ pts | join(' ') }}" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>
+        {% set pts2 = [] %}
+        {% set n2 = ha | length %}
+        {% for v in ha %}
+          {% set _ = pts2.append("%.1f,%.1f" | format((loop.index0 / (n2 - 1)) * 200, 50 - ((v - vmin) / vrng) * 48)) %}
+        {% endfor %}
+        <polyline points="{{ pts2 | join(' ') }}" fill="none" stroke="#ff8a65" stroke-width="1.5" stroke-dasharray="4,2"/>
+      </svg>
+      <div class="heat-spark-legend">
+        <span class="leg-actual">Actual temp</span>
+        <span class="leg-app">Feels-like</span>
+      </div>
+    </div>
+    {% endif %}
+    <div class="heat-nws-cats">
+      <span class="dim" style="width:100%; font-size:.63rem; letter-spacing:.08em; text-transform:uppercase;">NWS heat index scale</span>
+      {% for label, color, rng in [
+          ('Normal',          '#2e7d32', '< 80°F'),
+          ('Caution',         '#f9a825', '80–90°F'),
+          ('Extreme Caution', '#ef6c00', '90–103°F'),
+          ('Danger',          '#c62828', '103–124°F'),
+          ('Extreme Danger',  '#6a1b9a', '≥ 125°F'),
+        ] %}
+      <div class="heat-nws-cat">
+        <div class="heat-nws-swatch" style="background: {{ color }};"></div>
+        <span>{{ label }} <span class="dim">({{ rng }})</span></span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="dim">Heat data unavailable</div>
     {% endif %}
   </div>
 
