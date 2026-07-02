@@ -301,6 +301,29 @@ PAGE = r"""
   /* tooltip on jargon: dotted underline + native title= */
   .jargon { border-bottom: 1px dotted var(--dim); cursor: help; }
 
+  .ml-subtitle {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    margin-left: .45rem;
+    font-size: .72rem;
+    font-weight: 500;
+    color: var(--dim);
+    letter-spacing: 0;
+    text-transform: none;
+    vertical-align: middle;
+  }
+  .ml-subtitle .dot { opacity: .65; }
+  .ml-subtitle .site-chip {
+    display: inline-block;
+    padding: .08rem .38rem;
+    border-radius: 999px;
+    border: 1px solid #2a2e36;
+    background: #11141a;
+    color: var(--text);
+    font-weight: 600;
+  }
+
   /* compact triggers row: fired ones bright, off ones muted */
   .trig-strip { display:flex; flex-wrap:wrap; gap:.35rem; }
   .trig { padding:.25rem .55rem; border-radius:999px; font-size:.74rem;
@@ -516,9 +539,12 @@ PAGE = r"""
   <div class="card span12">
     <h2>
       <span class="jargon" title="{{ data.glossary['ML forecast'] }}">ML stage forecast</span>
-      <span class="dim" style="font-size:.7rem; font-weight:400; letter-spacing:0;
-             text-transform:none; margin-left:.4rem;">
-        LightGBM · trained on USGS history · site {{ data.primary_site }}
+      <span class="ml-subtitle">
+        <span>LightGBM model</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span>trained on USGS gauge history</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span class="site-chip">site {{ data.primary_site }}</span>
       </span>
     </h2>
 
