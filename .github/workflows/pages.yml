@@ -8,9 +8,10 @@ on:
     - cron: "17 * * * *"
   workflow_dispatch:
 
-# Minimal default; each job grants only what it needs.
 permissions:
-  contents: read
+  contents: write   # history snapshot commit
+  pages: write
+  id-token: write
 
 # Only one Pages deploy at a time; never cancel an in-progress deploy.
 concurrency:
@@ -18,26 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-
-      - name: Run tests
-        run: uv run pytest -q
-
   build:
-    needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # needed to push the history snapshot commit
-      pages: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +31,12 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
+
+      # Run tests before building so a broken commit never produces a bad deploy.
+      # Failures here block deploy but do NOT cancel the hourly schedule —
+      # the next hourly run will retry automatically.
+      - name: Run tests
+        run: uv run pytest -q
 
       - name: Build static site
         run: uv run python build_static.py
