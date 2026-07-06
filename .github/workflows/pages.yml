@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -38,17 +38,16 @@ jobs:
       - name: Build static site
         run: uv run python build_static.py
 
-      - name: Commit appended history partition
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain data/history)" ]; then
-            git add data/history
-            git commit -m "history: hourly snapshot $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
-            git push
-          else
-            echo "no history change to commit"
-          fi
+      # Upload the history partition as a separate artifact so the
+      # commit-history job can persist it AFTER the Pages deploy succeeds,
+      # keeping the repo HEAD stable during the deploy step.
+      - name: Save history snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-snapshot
+          path: data/history/
+          retention-days: 1
+          if-no-files-changed: ignore
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -65,3 +64,32 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  commit-history:
+    # Runs after a successful deploy so git push never advances HEAD before
+    # deploy-pages validates pages_build_version against the branch SHA.
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download history snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: history-snapshot
+          path: data/history/
+
+      - name: Commit appended history partition
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash
+          if [ -n "$(git status --porcelain data/history)" ]; then
+            git add data/history
+            git commit -m "history: hourly snapshot $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+            git push
+          else
+            echo "no history change to commit"
+          fi
