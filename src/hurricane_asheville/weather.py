@@ -116,4 +116,12 @@ def fetch_current_weather(lat: float, lon: float, timeout: int = 15) -> dict:
         "hourly_apparent_f": [v for v in (hourly.get("apparent_temperature") or [])[:24] if v is not None],
         "hourly_rh": [v for v in (hourly.get("relative_humidity_2m") or [])[:24] if v is not None],
         "hourly_times": list((hourly.get("time") or [])[:24]),
+        "hourly_wet_bulb_f": [
+            _wet_bulb_f(t, r)
+            for t, r in zip(
+                (hourly.get("temperature_2m") or [])[:24],
+                (hourly.get("relative_humidity_2m") or [])[:24],
+            )
+            if t is not None and r is not None
+        ],
     }

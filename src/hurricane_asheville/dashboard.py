@@ -538,7 +538,7 @@ PAGE = r"""
     text-transform: uppercase;
     margin-bottom: .3rem;
   }
-  .heat-spark { height: 68px; width: 100%; display: block; }
+  .heat-spark { height: 90px; width: 100%; display: block; }
   .heat-spark-legend {
     display: flex;
     gap: 1rem;
@@ -548,17 +548,26 @@ PAGE = r"""
   }
   .heat-spark-legend .leg-actual::before { content: '\2014\00a0'; color: #4fc3f7; }
   .heat-spark-legend .leg-app::before    { content: '\2013\00a0'; color: #ff8a65; }
+  .heat-spark-legend .leg-wb::before     { content: '\00B7\00B7\00B7\00a0'; color: #69f0ae; font-size: .9em; }
   .heat-nws-cats {
     margin-top: .8rem;
     padding-top: .65rem;
     border-top: 1px solid #2a2e36;
-    display: flex;
-    flex-wrap: wrap;
-    gap: .45rem .9rem;
-    font-size: .72rem;
   }
-  .heat-nws-cat { display: flex; align-items: center; gap: .35rem; }
-  .heat-nws-swatch { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 10px; }
+  .heat-scale-label {
+    font-size: .63rem;
+    color: var(--dim);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: .3rem;
+  }
+  .heat-scale-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+    margin: .3rem 0 .4rem;
+  }
 
   /* compact triggers row: fired ones bright, off ones muted */
   .trig-strip { display:flex; flex-wrap:wrap; gap:.35rem; }
@@ -917,7 +926,11 @@ PAGE = r"""
         <div class="heat-row"><span>Feels like</span><b>{{ w.apparent_temp_f }}&deg;F</b></div>
         {% endif %}
         {% if w.wet_bulb_f is not none %}
-        <div class="heat-row"><span><span class="jargon" title="Lowest temperature achievable by evaporative cooling; key heat-stress indicator.">Wet-bulb temp</span></span><b>{{ w.wet_bulb_f }}&deg;F</b></div>
+        {% set _wb_col = '#6a1b9a' if w.wet_bulb_f >= 83 else ('#c62828' if w.wet_bulb_f >= 78 else ('#ef6c00' if w.wet_bulb_f >= 72 else ('#f9a825' if w.wet_bulb_f >= 65 else '#2e7d32'))) %}
+        <div class="heat-row" style="border-left: 2px solid {{ _wb_col }}; padding-left: .45rem;">
+          <span><span class="jargon" title="Lowest temperature achievable by evaporative cooling; ≥78 °F = heat-illness danger zone.">Wet-bulb temp</span></span>
+          <b style="color: {{ _wb_col }};">{{ w.wet_bulb_f }}&deg;F</b>
+        </div>
         {% endif %}
         {% if w.dew_point_f is not none %}
         <div class="heat-row"><span>Dew point</span><b>{{ w.dew_point_f }}&deg;F</b></div>
@@ -927,20 +940,31 @@ PAGE = r"""
     </div>
     {% set ht = w.hourly_temp_f %}
     {% set ha = w.hourly_apparent_f %}
+    {% set hwb = (w.hourly_wet_bulb_f or []) %}
     {% if ht and ha and ht | length > 1 %}
     <div class="heat-sparkline">
       <div class="heat-spark-title">24-hour temperature forecast</div>
       {% set n = ht | length %}
-      {% set _all = ht + ha %}
+      {% set _all = ht + ha + hwb %}
       {% set vmin = _all | min - 2 %}
       {% set vmax = _all | max + 2 %}
       {% set vrng = (vmax - vmin) if (vmax - vmin) > 0.1 else 0.1 %}
       {% set times = w.hourly_times %}
-      <svg class="heat-spark" viewBox="0 0 200 68" preserveAspectRatio="none">
-        {# chart area is rows 0-50; label area is rows 52-68 #}
+      <svg class="heat-spark" viewBox="0 0 200 82" preserveAspectRatio="none">
+        {# chart area y 1-58; baseline y=60; tick stubs y=60-63; hour labels y=75 #}
+        {# coloured reference lines at 80 °F and 90 °F when in range #}
+        {% for ref_t, ref_c, ref_lbl in [(90, '#ef6c00', '90°'), (80, '#f9a825', '80°')] %}
+          {% if ref_t > vmin and ref_t < vmax %}
+            {% set yr = 58 - ((ref_t - vmin) / vrng) * 55 %}
+            <line x1="0" y1="{{ '%.1f'|format(yr) }}" x2="200" y2="{{ '%.1f'|format(yr) }}"
+                  stroke="{{ ref_c }}" stroke-width="0.7" stroke-dasharray="3,3" opacity="0.6"/>
+            <text x="199" y="{{ '%.1f'|format(yr - 1.5) }}" text-anchor="end"
+                  font-size="6" fill="{{ ref_c }}" opacity="0.9">{{ ref_lbl }}</text>
+          {% endif %}
+        {% endfor %}
         {# horizontal baseline #}
-        <line x1="0" y1="51" x2="200" y2="51" stroke="#2a2e36" stroke-width="0.5"/>
-        {# tick marks + hour labels every 6 points (0, 6, 12, 18, 23) #}
+        <line x1="0" y1="60" x2="200" y2="60" stroke="#2a2e36" stroke-width="0.5"/>
+        {# tick marks + hour labels every 6 h #}
         {% for i in [0, 6, 12, 18] + ([n - 1] if (n - 1) % 6 != 0 else []) %}
           {% if i < n %}
             {% set x = (i / (n - 1)) * 200 %}
@@ -950,47 +974,119 @@ PAGE = r"""
             {% else %}
               {% set hr = i | string %}
             {% endif %}
-            <line x1="{{ '%.1f' | format(x) }}" y1="51"
-                  x2="{{ '%.1f' | format(x) }}" y2="54"
+            <line x1="{{ '%.1f' | format(x) }}" y1="60"
+                  x2="{{ '%.1f' | format(x) }}" y2="63"
                   stroke="#9aa0aa" stroke-width="0.5"/>
-            <text x="{{ '%.1f' | format(x) }}" y="63"
+            <text x="{{ '%.1f' | format(x) }}" y="75"
                   text-anchor="{% if i == 0 %}start{% elif i >= n - 2 %}end{% else %}middle{% endif %}"
                   font-size="7" fill="#9aa0aa">{{ hr }}h</text>
           {% endif %}
         {% endfor %}
-        {# temp lines #}
+        {# Y-axis extremes #}
+        <text x="1" y="8" font-size="6" fill="#9aa0aa">{{ vmax | round | int }}&deg;</text>
+        <text x="1" y="57" font-size="6" fill="#9aa0aa">{{ vmin | round | int }}&deg;</text>
+        {# actual temp — solid cyan #}
         {% set pts = [] %}
         {% for v in ht %}
-          {% set _ = pts.append("%.1f,%.1f" | format((loop.index0 / (n - 1)) * 200, 49 - ((v - vmin) / vrng) * 47)) %}
+          {% set _ = pts.append("%.1f,%.1f" | format((loop.index0 / (n - 1)) * 200, 58 - ((v - vmin) / vrng) * 55)) %}
         {% endfor %}
         <polyline points="{{ pts | join(' ') }}" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>
+        {# feels-like — dashed orange #}
         {% set pts2 = [] %}
         {% set n2 = ha | length %}
         {% for v in ha %}
-          {% set _ = pts2.append("%.1f,%.1f" | format((loop.index0 / (n2 - 1)) * 200, 49 - ((v - vmin) / vrng) * 47)) %}
+          {% set _ = pts2.append("%.1f,%.1f" | format((loop.index0 / (n2 - 1)) * 200, 58 - ((v - vmin) / vrng) * 55)) %}
         {% endfor %}
         <polyline points="{{ pts2 | join(' ') }}" fill="none" stroke="#ff8a65" stroke-width="1.5" stroke-dasharray="4,2"/>
+        {# wet-bulb — dotted green #}
+        {% if hwb | length > 1 %}
+          {% set pts3 = [] %}
+          {% set n3 = hwb | length %}
+          {% for v in hwb %}
+            {% set _ = pts3.append("%.1f,%.1f" | format((loop.index0 / (n3 - 1)) * 200, 58 - ((v - vmin) / vrng) * 55)) %}
+          {% endfor %}
+          <polyline points="{{ pts3 | join(' ') }}" fill="none" stroke="#69f0ae" stroke-width="1.2" stroke-dasharray="2,3"/>
+        {% endif %}
       </svg>
       <div class="heat-spark-legend">
         <span class="leg-actual">Actual temp</span>
         <span class="leg-app">Feels-like</span>
+        {% if hwb | length > 1 %}<span class="leg-wb">Wet-bulb</span>{% endif %}
       </div>
     </div>
     {% endif %}
     <div class="heat-nws-cats">
-      <span class="dim" style="width:100%; font-size:.63rem; letter-spacing:.08em; text-transform:uppercase;">NWS heat index scale</span>
-      {% for label, color, rng in [
-          ('Normal',          '#2e7d32', '< 80°F'),
-          ('Caution',         '#f9a825', '80–90°F'),
-          ('Extreme Caution', '#ef6c00', '90–103°F'),
-          ('Danger',          '#c62828', '103–124°F'),
-          ('Extreme Danger',  '#6a1b9a', '≥ 125°F'),
-        ] %}
-      <div class="heat-nws-cat">
-        <div class="heat-nws-swatch" style="background: {{ color }};"></div>
-        <span>{{ label }} <span class="dim">({{ rng }})</span></span>
-      </div>
-      {% endfor %}
+      <div class="heat-scale-label">NWS heat index scale</div>
+      {% set sc_min = 60 %}
+      {% set sc_rng = 70 %}
+      <svg class="heat-scale-svg" viewBox="0 0 200 38" preserveAspectRatio="none">
+        {% for color, lo, hi_v, lbl in [
+            ('#2e7d32',  60,  80,  'Normal'),
+            ('#f9a825',  80,  90,  'Caution'),
+            ('#ef6c00',  90,  103, 'Ext. Caution'),
+            ('#c62828',  103, 124, 'Danger'),
+            ('#6a1b9a',  124, 130, 'Extreme'),
+          ] %}
+          {% set x1 = (lo - sc_min) / sc_rng * 200 %}
+          {% set x2 = (([hi_v, 130] | min) - sc_min) / sc_rng * 200 %}
+          <rect x="{{ '%.2f'|format(x1) }}" y="4" width="{{ '%.2f'|format(x2 - x1) }}" height="12" fill="{{ color }}"/>
+          {% if (x2 - x1) > 22 %}
+            <text x="{{ '%.1f'|format((x1 + x2) / 2) }}" y="13.5" text-anchor="middle"
+                  font-size="5.5" fill="#fff" font-weight="700">{{ lbl }}</text>
+          {% endif %}
+        {% endfor %}
+        {# current value marker #}
+        {% if w.heat_index_f is not none %}
+          {% set mx_raw = (w.heat_index_f - sc_min) / sc_rng * 200 %}
+          {% set mx = [mx_raw, 1] | max %}
+          {% set mx = [mx, 199] | min %}
+          <line x1="{{ '%.1f'|format(mx) }}" y1="2" x2="{{ '%.1f'|format(mx) }}" y2="17"
+                stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.95"/>
+          <circle cx="{{ '%.1f'|format(mx) }}" cy="2" r="3"
+                  fill="{{ w.heat_color }}" stroke="#fff" stroke-width="1.5"/>
+          <text x="{{ '%.1f'|format(mx) }}" y="30"
+                text-anchor="{% if mx < 25 %}start{% elif mx > 175 %}end{% else %}middle{% endif %}"
+                font-size="8.5" fill="{{ w.heat_color }}" font-weight="700">{{ w.heat_index_f }}&deg;F</text>
+        {% endif %}
+        <text x="0"   y="38" font-size="5.5" fill="#9aa0aa">60°F</text>
+        <text x="200" y="38" font-size="5.5" fill="#9aa0aa" text-anchor="end">130°F+</text>
+      </svg>
+      {% if w.wet_bulb_f is not none %}
+      <div class="heat-scale-label" style="margin-top:.6rem;">Wet-bulb temperature</div>
+      {% set wb_min = 55 %}
+      {% set wb_rng = 35 %}
+      <svg class="heat-scale-svg" viewBox="0 0 200 38" preserveAspectRatio="none">
+        {% for color, lo, hi_v, lbl in [
+            ('#2e7d32', 55, 65, 'Low Risk'),
+            ('#f9a825', 65, 72, 'Caution'),
+            ('#ef6c00', 72, 78, 'High Risk'),
+            ('#c62828', 78, 83, 'Danger'),
+            ('#6a1b9a', 83, 90, 'Extreme'),
+          ] %}
+          {% set x1 = (lo - wb_min) / wb_rng * 200 %}
+          {% set x2 = (([hi_v, 90] | min) - wb_min) / wb_rng * 200 %}
+          <rect x="{{ '%.2f'|format(x1) }}" y="4" width="{{ '%.2f'|format(x2 - x1) }}" height="12" fill="{{ color }}"/>
+          {% if (x2 - x1) > 22 %}
+            <text x="{{ '%.1f'|format((x1 + x2) / 2) }}" y="13.5" text-anchor="middle"
+                  font-size="5.5" fill="#fff" font-weight="700">{{ lbl }}</text>
+          {% endif %}
+        {% endfor %}
+        {# current wet-bulb marker #}
+        {% set wbx_raw = (w.wet_bulb_f - wb_min) / wb_rng * 200 %}
+        {% set wbx = [wbx_raw, 1] | max %}
+        {% set wbx = [wbx, 199] | min %}
+        {% set wb_col = '#6a1b9a' if w.wet_bulb_f >= 83 else ('#c62828' if w.wet_bulb_f >= 78 else ('#ef6c00' if w.wet_bulb_f >= 72 else ('#f9a825' if w.wet_bulb_f >= 65 else '#2e7d32'))) %}
+        <line x1="{{ '%.1f'|format(wbx) }}" y1="2" x2="{{ '%.1f'|format(wbx) }}" y2="17"
+              stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.95"/>
+        <circle cx="{{ '%.1f'|format(wbx) }}" cy="2" r="3"
+                fill="{{ wb_col }}" stroke="#fff" stroke-width="1.5"/>
+        <text x="{{ '%.1f'|format(wbx) }}" y="30"
+              text-anchor="{% if wbx < 25 %}start{% elif wbx > 175 %}end{% else %}middle{% endif %}"
+              font-size="8.5" fill="{{ wb_col }}" font-weight="700">{{ w.wet_bulb_f }}&deg;F</text>
+        <text x="0"   y="38" font-size="5.5" fill="#9aa0aa">55°F</text>
+        <text x="200" y="38" font-size="5.5" fill="#9aa0aa" text-anchor="end">90°F+</text>
+      </svg>
+      {% endif %}
     </div>
     {% else %}
     <div class="dim">Heat data unavailable</div>
