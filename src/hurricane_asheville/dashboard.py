@@ -925,7 +925,7 @@ PAGE = r"""
         {% if w.apparent_temp_f is not none %}
         <div class="heat-row"><span>Feels like</span><b>{{ w.apparent_temp_f }}&deg;F</b></div>
         {% endif %}
-        {% if w.wet_bulb_f is not none %}
+        {% if w.wet_bulb_f is defined and w.wet_bulb_f is not none %}
         {% set _wb_col = '#6a1b9a' if w.wet_bulb_f >= 83 else ('#c62828' if w.wet_bulb_f >= 78 else ('#ef6c00' if w.wet_bulb_f >= 72 else ('#f9a825' if w.wet_bulb_f >= 65 else '#2e7d32'))) %}
         <div class="heat-row" style="border-left: 2px solid {{ _wb_col }}; padding-left: .45rem;">
           <span><span class="jargon" title="Lowest temperature achievable by evaporative cooling; ≥78 °F = heat-illness danger zone.">Wet-bulb temp</span></span>
