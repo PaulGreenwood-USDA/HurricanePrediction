@@ -538,7 +538,19 @@ PAGE = r"""
     text-transform: uppercase;
     margin-bottom: .3rem;
   }
-  .heat-spark { height: 90px; width: 100%; display: block; }
+  .heat-spark { height: 70px; width: 100%; display: block; }
+  .heat-spark-times {
+    position: relative;
+    height: 16px;
+    margin-top: 2px;
+  }
+  .heat-spark-times span {
+    position: absolute;
+    font-size: .62rem;
+    color: var(--dim);
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
   .heat-spark-legend {
     display: flex;
     gap: 1rem;
@@ -942,72 +954,74 @@ PAGE = r"""
     {% set ha = w.hourly_apparent_f %}
     {% set hwb = (w.hourly_wet_bulb_f or []) %}
     {% if ht and ha and ht | length > 1 %}
+    {% set n = ht | length %}
+    {% set _all = ht + ha + (hwb if hwb else []) %}
+    {% set vmin = _all | min - 1 %}
+    {% set vmax = _all | max + 1 %}
+    {% set vrng = (vmax - vmin) if (vmax - vmin) > 0.1 else 0.1 %}
+    {% set times = w.hourly_times %}
     <div class="heat-sparkline">
-      <div class="heat-spark-title">24-hour temperature forecast</div>
-      {% set n = ht | length %}
-      {% set _all = ht + ha + hwb %}
-      {% set vmin = _all | min - 2 %}
-      {% set vmax = _all | max + 2 %}
-      {% set vrng = (vmax - vmin) if (vmax - vmin) > 0.1 else 0.1 %}
-      {% set times = w.hourly_times %}
-      <svg class="heat-spark" viewBox="0 0 200 82" preserveAspectRatio="none">
-        {# chart area y 1-58; baseline y=60; tick stubs y=60-63; hour labels y=75 #}
-        {# coloured reference lines at 80 °F and 90 °F when in range #}
-        {% for ref_t, ref_c, ref_lbl in [(90, '#ef6c00', '90°'), (80, '#f9a825', '80°')] %}
+      <div class="heat-spark-title">
+        24-hour temperature forecast
+        <span class="dim" style="font-weight:400; margin-left:.4rem; font-size:.6rem; letter-spacing:0;">
+          {{ vmin | round | int }}&ndash;{{ vmax | round | int }}&deg;F
+        </span>
+      </div>
+      <svg class="heat-spark" viewBox="0 0 200 52" preserveAspectRatio="none">
+        {# reference lines at 80 °F and 90 °F — no text (avoids stretch distortion) #}
+        {% for ref_t, ref_c in [(90, '#ef6c00'), (80, '#f9a825')] %}
           {% if ref_t > vmin and ref_t < vmax %}
-            {% set yr = 58 - ((ref_t - vmin) / vrng) * 55 %}
+            {% set yr = 50 - ((ref_t - vmin) / vrng) * 48 %}
             <line x1="0" y1="{{ '%.1f'|format(yr) }}" x2="200" y2="{{ '%.1f'|format(yr) }}"
-                  stroke="{{ ref_c }}" stroke-width="0.7" stroke-dasharray="3,3" opacity="0.6"/>
-            <text x="199" y="{{ '%.1f'|format(yr - 1.5) }}" text-anchor="end"
-                  font-size="6" fill="{{ ref_c }}" opacity="0.9">{{ ref_lbl }}</text>
+                  stroke="{{ ref_c }}" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.5"/>
           {% endif %}
         {% endfor %}
         {# horizontal baseline #}
-        <line x1="0" y1="60" x2="200" y2="60" stroke="#2a2e36" stroke-width="0.5"/>
-        {# tick marks + hour labels every 6 h #}
+        <line x1="0" y1="51" x2="200" y2="51" stroke="#2a2e36" stroke-width="0.5"/>
+        {# tick stubs only — labels rendered as HTML below #}
         {% for i in [0, 6, 12, 18] + ([n - 1] if (n - 1) % 6 != 0 else []) %}
           {% if i < n %}
             {% set x = (i / (n - 1)) * 200 %}
-            {% set hr = '' %}
-            {% if times and i < times | length %}
-              {% set hr = times[i][-5:-3] %}
-            {% else %}
-              {% set hr = i | string %}
-            {% endif %}
-            <line x1="{{ '%.1f' | format(x) }}" y1="60"
-                  x2="{{ '%.1f' | format(x) }}" y2="63"
-                  stroke="#9aa0aa" stroke-width="0.5"/>
-            <text x="{{ '%.1f' | format(x) }}" y="75"
-                  text-anchor="{% if i == 0 %}start{% elif i >= n - 2 %}end{% else %}middle{% endif %}"
-                  font-size="7" fill="#9aa0aa">{{ hr }}h</text>
+            <line x1="{{ '%.1f'|format(x) }}" y1="51" x2="{{ '%.1f'|format(x) }}" y2="52"
+                  stroke="#9aa0aa" stroke-width="0.8"/>
           {% endif %}
         {% endfor %}
-        {# Y-axis extremes #}
-        <text x="1" y="8" font-size="6" fill="#9aa0aa">{{ vmax | round | int }}&deg;</text>
-        <text x="1" y="57" font-size="6" fill="#9aa0aa">{{ vmin | round | int }}&deg;</text>
         {# actual temp — solid cyan #}
         {% set pts = [] %}
         {% for v in ht %}
-          {% set _ = pts.append("%.1f,%.1f" | format((loop.index0 / (n - 1)) * 200, 58 - ((v - vmin) / vrng) * 55)) %}
+          {% set _ = pts.append("%.1f,%.1f"|format((loop.index0/(n-1))*200, 50-((v-vmin)/vrng)*48)) %}
         {% endfor %}
-        <polyline points="{{ pts | join(' ') }}" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>
+        <polyline points="{{ pts|join(' ') }}" fill="none" stroke="#4fc3f7" stroke-width="1.5"/>
         {# feels-like — dashed orange #}
         {% set pts2 = [] %}
         {% set n2 = ha | length %}
         {% for v in ha %}
-          {% set _ = pts2.append("%.1f,%.1f" | format((loop.index0 / (n2 - 1)) * 200, 58 - ((v - vmin) / vrng) * 55)) %}
+          {% set _ = pts2.append("%.1f,%.1f"|format((loop.index0/(n2-1))*200, 50-((v-vmin)/vrng)*48)) %}
         {% endfor %}
-        <polyline points="{{ pts2 | join(' ') }}" fill="none" stroke="#ff8a65" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <polyline points="{{ pts2|join(' ') }}" fill="none" stroke="#ff8a65" stroke-width="1.5" stroke-dasharray="4,2"/>
         {# wet-bulb — dotted green #}
         {% if hwb | length > 1 %}
           {% set pts3 = [] %}
           {% set n3 = hwb | length %}
           {% for v in hwb %}
-            {% set _ = pts3.append("%.1f,%.1f" | format((loop.index0 / (n3 - 1)) * 200, 58 - ((v - vmin) / vrng) * 55)) %}
+            {% set _ = pts3.append("%.1f,%.1f"|format((loop.index0/(n3-1))*200, 50-((v-vmin)/vrng)*48)) %}
           {% endfor %}
-          <polyline points="{{ pts3 | join(' ') }}" fill="none" stroke="#69f0ae" stroke-width="1.2" stroke-dasharray="2,3"/>
+          <polyline points="{{ pts3|join(' ') }}" fill="none" stroke="#69f0ae" stroke-width="1.2" stroke-dasharray="2,3"/>
         {% endif %}
       </svg>
+      {# Hour labels as HTML — immune to SVG aspect-ratio stretch #}
+      <div class="heat-spark-times">
+        {% for i in [0, 6, 12, 18] + ([n - 1] if (n - 1) % 6 != 0 else []) %}
+          {% if i < n %}
+            {% set hr = times[i][-5:-3] if (times and i < times|length) else i|string %}
+            {% set pct = (i / (n - 1)) * 100 %}
+            <span style="left:{{ '%.1f'|format(pct) }}%;
+                         {% if i == 0 %}transform:none;{% elif i >= n - 2 %}transform:translateX(-100%);{% endif %}">
+              {{ hr }}h
+            </span>
+          {% endif %}
+        {% endfor %}
+      </div>
       <div class="heat-spark-legend">
         <span class="leg-actual">Actual temp</span>
         <span class="leg-app">Feels-like</span>
