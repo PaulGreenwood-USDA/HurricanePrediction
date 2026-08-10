@@ -107,9 +107,22 @@ def test_stage_pills_use_single_token_classes(client, fake_state):
     fake_state["gauges"] = [
         {"site_id": "03451500", "label": "French Broad @ Asheville",
          "role": "primary", "lat": 35.6, "lon": -82.6, "stage_ft": 1.67,
+         "pool_elevation_ft": None, "display_ft": 1.67, "display_units": "ft",
          "flood_category": "below action", "flood_class": "below-action",
-         "thresholds": {"action": 7.0, "minor": 9.5,
-                        "moderate": 12.0, "major": 16.0},
+         "thresholds": {"action": 6.5, "minor": 9.5,
+                        "moderate": 13.0, "major": 18.0},
+         "thresholds_label": "NWS flood stages here: action 6.5 ft",
+         "rate_ft_per_hr": 0.0, "history": [],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+        {"site_id": "02087182", "label": "Falls Lake above dam",
+         "role": "reservoir", "lat": 35.94, "lon": -78.58, "stage_ft": None,
+         "pool_elevation_ft": 248.90, "display_ft": 248.90,
+         "display_units": "ft pool elev",
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": {"action": 264.0, "minor": 265.0,
+                        "moderate": 266.0, "major": 267.0},
+         "thresholds_label": "NWS flood stages here: action 264 ft pool elev",
          "rate_ft_per_hr": 0.0, "history": [],
          "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
          "nwps_forecast": None},
@@ -117,6 +130,25 @@ def test_stage_pills_use_single_token_classes(client, fake_state):
     body = client.get("/").get_data(as_text=True)
     assert 'class="stage-pill below-action"' in body
     assert 'class="stage-pill below action"' not in body
+
+
+def test_reservoir_row_shows_pool_elevation_with_units(client, fake_state):
+    """A reservoir reports 00062 pool elevation, not river stage. Before the
+    dashboard requested 00062 the row rendered a bare '?'."""
+    fake_state["gauges"] = [
+        {"site_id": "02087182", "label": "Falls Lake above dam",
+         "role": "reservoir", "lat": 35.94, "lon": -78.58, "stage_ft": None,
+         "pool_elevation_ft": 248.90, "display_ft": 248.90,
+         "display_units": "ft pool elev",
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": None, "thresholds_label": "",
+         "rate_ft_per_hr": 0.0, "history": [],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+    ]
+    body = client.get("/").get_data(as_text=True)
+    assert "248.90" in body
+    assert "ft pool elev" in body
 
 
 def test_api_state_returns_json(client, fake_state):

@@ -31,28 +31,36 @@ from .weather import fetch_current_weather
 
 # (site_id, label, lat, lon, role) — per-forest USGS streamgauges.
 # Same shape as gauge.UPSTREAM_GAUGES so we can reuse `fetch_gauge`.
+#
+# Ids, labels and coordinates are the authoritative USGS ones, verified against
+# the NWIS site service (see tests/test_gauge_registry.py). An earlier revision
+# had eight entries here whose ids pointed at different rivers than the label
+# claimed -- 02093229 was labelled "White Oak River at Maysville" but is
+# Hewletts Creek in Wilmington, 60 mi from Croatan.
 FOREST_GAUGES: dict[str, tuple[tuple[str, str, float, float, str], ...]] = {
     "Pisgah": (
         ("03451500", "French Broad @ Asheville",        35.6090, -82.5790, "primary"),
         ("03451000", "Swannanoa River @ Biltmore",      35.5073, -82.5365, "tributary"),
-        ("03456500", "Pigeon River @ Canton",           35.5326, -82.8376, "regional"),
-        ("02151500", "Broad River nr Bat Cave",         35.4576, -82.2843, "regional"),
+        ("03456991", "Pigeon River nr Canton",          35.5219, -82.8481, "regional"),
+        # Nearest active gauge on the Broad; the Hickory Nut Gorge / Lake Lure
+        # reach upstream has none.
+        ("02151500", "Broad River nr Boiling Springs",  35.2113, -81.6984, "regional"),
     ),
     "Nantahala": (
-        ("03512000", "Oconaluftee @ Birdtown",          35.4623, -83.3457, "primary"),
-        ("03513000", "Tuckasegee @ Bryson City",        35.4334, -83.4471, "tributary"),
-        ("03500000", "Little Tennessee nr Prentiss",    35.0871, -83.3879, "headwaters"),
-        ("03550000", "Cheoah River nr Robbinsville",    35.3409, -83.8338, "regional"),
+        ("03512000", "Oconaluftee @ Birdtown",          35.4614, -83.3536, "primary"),
+        ("03513000", "Tuckasegee @ Bryson City",        35.4275, -83.4469, "tributary"),
+        ("03500000", "Little Tennessee nr Prentiss",    35.1500, -83.3797, "headwaters"),
+        ("03550000", "Valley River at Tomotla",         35.1389, -83.9806, "regional"),
     ),
     "Uwharrie": (
-        ("02126000", "Pee Dee River nr Wadesboro",      34.9893, -80.0648, "primary"),
-        ("02125000", "Rocky River nr Norwood",          35.2540, -80.1284, "tributary"),
-        ("02118500", "Yadkin River at Yadkin College",  35.8454, -80.3853, "regional"),
+        ("02123500", "Uwharrie River nr Eldorado",      35.4315, -80.0166, "primary"),
+        ("02126000", "Rocky River nr Norwood",          35.1570, -80.1658, "tributary"),
+        ("02116500", "Yadkin River at Yadkin College",  35.8567, -80.3869, "regional"),
     ),
     "Croatan": (
-        ("02092500", "Trent River nr Trenton",          35.0651, -77.4047, "tributary"),
-        ("02091814", "Neuse River at Kinston",          35.2596, -77.5811, "primary"),
-        ("02093229", "White Oak River at Maysville",    34.9020, -77.2369, "regional"),
+        ("02092500", "Trent River nr Trenton",          35.0642, -77.4614, "tributary"),
+        ("02091814", "Neuse River nr Fort Barnwell",    35.3139, -77.3028, "primary"),
+        ("02093000", "New River nr Gum Branch",         34.8492, -77.5194, "regional"),
     ),
 }
 

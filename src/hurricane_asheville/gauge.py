@@ -103,6 +103,12 @@ RESERVOIR_ROLES = {"reservoir"}
 
 # Upstream / nearby gauges that give early warning (hours of lead-time on Asheville).
 # (site_id, label, lat, lon, role)
+#
+# Site ids and coordinates are the authoritative USGS ones, verified against
+# the NWIS site service. Labels paraphrase the official station name; where
+# they differ the official name is in a trailing comment. Do not edit a label
+# without checking that the site id still refers to that station -- an earlier
+# revision had eight entries whose ids pointed at entirely different rivers.
 UPSTREAM_GAUGES = [
     ("03439000", "French Broad @ Rosman (headwaters)", 35.1432, -82.8262, "headwaters"),
     ("03443000", "French Broad @ Blantyre",            35.3576, -82.6171, "upstream"),
@@ -110,24 +116,34 @@ UPSTREAM_GAUGES = [
     ("03451000", "Swannanoa River @ Biltmore",         35.5073, -82.5365, "tributary"),
     ("03451500", "French Broad @ Asheville",           35.6090, -82.5790, "primary"),
     # WNC mountain coverage (Pisgah/Nantahala forests, Helene hot zones)
-    ("03456500", "Pigeon River @ Canton",              35.5326, -82.8376, "regional"),
-    ("02151500", "Broad River nr Bat Cave (Lake Lure)", 35.4576, -82.2843, "regional"),
+    ("03456991", "Pigeon River nr Canton",             35.5219, -82.8481, "regional"),
+    # Broad River basin drains the Hickory Nut Gorge / Lake Lure area, but the
+    # nearest active real-time gauge on it is ~37 mi downstream at Boiling Springs.
+    ("02151500", "Broad River nr Boiling Springs",     35.2113, -81.6984, "regional"),
     ("03512000", "Oconaluftee @ Birdtown (Smokies)",   35.4623, -83.3457, "regional"),
+    # No USGS real-time gauge exists on Fontana Reservoir (TVA publishes that
+    # pool). This is the nearest active gauge, on the Cheoah below Fontana.
+    ("0351706800", "Cheoah River nr Tapoco",           35.4383, -83.9189, "regional"),
     # ---- Statewide piedmont coverage (Catawba / Yadkin / Cape Fear basins) ----
-    ("02146000", "Catawba River nr Charlotte (Mtn Is.)", 35.3409, -80.9598, "statewide"),
-    ("02118500", "Yadkin River @ Yadkin College",       35.8454, -80.3853, "statewide"),
+    ("0214267602", "Catawba River blw Mountain Island Dam", 35.3340, -80.9864, "statewide"),
+    # No USGS real-time gauge on Lake Norman (Duke publishes that pool); this
+    # is the Catawba at Cowans Ford, the Lake Norman dam.
+    ("0214264790", "Catawba River @ Cowans Ford (Lake Norman dam)", 35.4277, -80.9573, "statewide"),
+    ("02116500", "Yadkin River @ Yadkin College",       35.8567, -80.3869, "statewide"),
     ("02129000", "Pee Dee River nr Rockingham",         35.0079, -79.8703, "statewide"),
-    ("02102000", "Cape Fear River @ Lillington",        35.3979, -78.8161, "statewide"),
+    ("02102500", "Cape Fear River @ Lillington",        35.4061, -78.8133, "statewide"),
     ("02105769", "Cape Fear River @ Lock 1 nr Kelly",   34.4040, -78.2980, "statewide"),
     # ---- Coastal-plain rivers (Tar, Neuse, Lumber) — tropical flood hot zones ----
     ("02083500", "Tar River @ Tarboro",                 35.8932, -77.5366, "statewide"),
-    ("02089000", "Neuse River @ Kinston",               35.2596, -77.5811, "statewide"),
-    ("02105500", "Lumber River @ Boardman",             34.4400, -79.0140, "statewide"),
-    # ---- Reservoir / lake stages (USACE / Duke / TVA — tropical release decisions) ----
-    ("0351706800", "Fontana Reservoir nr Fontana Dam",  35.4500, -83.8050, "reservoir"),
-    ("0208732885", "Falls Lake @ Falls Dam",            35.9395, -78.5828, "reservoir"),
-    ("02096960", "Jordan Lake @ Farrington",            35.7280, -79.0533, "reservoir"),
-    ("02143040", "Lake Norman @ Marshall Steam Plt",    35.5933, -80.9614, "reservoir"),
+    ("02089500", "Neuse River @ Kinston",               35.2578, -77.5856, "statewide"),
+    ("02134500", "Lumber River @ Boardman",             34.4425, -78.9603, "statewide"),
+    # ---- Reservoir pool elevations (USACE — tropical release decisions) ----
+    # These report 00062 pool elevation above datum, not 00065 river stage, so
+    # they are never flood-classified. Fontana (TVA) and Lake Norman (Duke)
+    # have no USGS real-time gauge at all; their nearest river gauges are in
+    # the sections above.
+    ("02087182", "Falls Lake above dam",                35.9411, -78.5833, "reservoir"),
+    ("02098197", "Jordan Lake at dam nr Moncure",       35.6547, -79.0683, "reservoir"),
 ]
 
 
@@ -143,6 +159,9 @@ class GaugeReading:
     pct_to_major: float | None
     flood_class: str = "unknown"
     thresholds: dict | None = field(default=None)
+    #: USGS 00062 reservoir pool elevation, feet above the site datum. This is
+    #: not a river stage and is never comparable to NWS flood thresholds.
+    pool_elevation_ft: float | None = None
 
 
 # Display label -> CSS class. The template used to derive this by string
@@ -170,15 +189,16 @@ def thresholds_for(site_id: str) -> dict | None:
     return FLOOD_STAGES_BY_SITE.get(site_id)
 
 
-def format_thresholds(t: dict | None) -> str:
+def format_thresholds(t: dict | None, units: str = "ft") -> str:
     """Human-readable threshold summary for a tooltip.
 
     Skips levels NWS leaves undefined at a gauge, so the UI never shows
-    "moderate None ft".
+    "moderate None ft". Reservoir thresholds are pool elevations, so the
+    caller passes the matching units.
     """
     if not t:
         return ""
-    parts = [f"{level} {t[level]:g} ft"
+    parts = [f"{level} {t[level]:g} {units}"
              for level in ("action", "minor", "moderate", "major")
              if t.get(level) is not None]
     return "NWS flood stages here: " + ", ".join(parts) if parts else ""
@@ -186,25 +206,35 @@ def format_thresholds(t: dict | None) -> str:
 
 def _classify(stage_ft: float | None,
               site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
-              role: str | None = None) -> str:
+              role: str | None = None,
+              pool_elevation_ft: float | None = None) -> str:
     """Classify a stage reading against *that site's* NWS thresholds.
 
     Never falls back to another site's thresholds: a gauge we have no
     published numbers for is reported as "no thresholds", not as safe.
+
+    A reservoir reporting pool elevation (USGS 00062) is compared only against
+    that reservoir's own thresholds, which NWS publishes in the same elevation
+    datum -- Falls Lake reads ~249 ft against a 264 ft flood pool. What must
+    never happen is comparing a pool elevation to a *river* gauge's stages;
+    the per-site lookup is what prevents it.
     """
-    if stage_ft is None:
+    reading = stage_ft if stage_ft is not None else pool_elevation_ft
+    if reading is None:
         return "unknown"
     t = FLOOD_STAGES_BY_SITE.get(site_id)
     if not t:
-        # Only a fallback: if NWS publishes flood stages for a site we use
-        # them, whatever role the site is tagged with.
-        return "pool stage" if role in RESERVOIR_ROLES else "no thresholds"
+        # Only a fallback: if NWS publishes stages for a site we use them,
+        # whatever role the site is tagged with.
+        if role in RESERVOIR_ROLES or stage_ft is None:
+            return "pool stage"
+        return "no thresholds"
     for level, label in (("major", "MAJOR FLOOD"),
                          ("moderate", "MODERATE FLOOD"),
                          ("minor", "MINOR FLOOD"),
                          ("action", "action stage")):
         v = t.get(level)
-        if v is not None and stage_ft >= v:
+        if v is not None and reading >= v:
             return label
     return "below action"
 
@@ -217,8 +247,9 @@ def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
         r = requests.get(
             USGS_NWIS_URL,
             params={
+                # 00060 discharge, 00062 reservoir pool elevation, 00065 stage.
                 "sites": site_id,
-                "parameterCd": "00060,00065",
+                "parameterCd": "00060,00062,00065",
                 "format": "json",
                 "siteStatus": "active",
             },
@@ -236,7 +267,7 @@ def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
         return None
 
     site_name = series[0]["sourceInfo"]["siteName"]
-    stage = discharge = None
+    stage = discharge = pool_elevation = None
     timestamp = ""
     for ts in series:
         code = ts["variable"]["variableCode"][0]["value"]
@@ -255,9 +286,12 @@ def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
             stage = v
         elif code == "00060":
             discharge = v
+        elif code == "00062":
+            pool_elevation = v
 
     t = thresholds_for(site_id)
-    category = _classify(stage, site_id=site_id, role=role)
+    category = _classify(stage, site_id=site_id, role=role,
+                         pool_elevation_ft=pool_elevation)
 
     def _pct(level: str) -> float | None:
         if stage is None or not t or not t.get(level):
@@ -275,20 +309,26 @@ def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
         pct_to_major=_pct("major"),
         flood_class=flood_class(category),
         thresholds=t,
+        pool_elevation_ft=pool_elevation,
     )
 
 
 # ---- 24h history + rate-of-rise -------------------------------------------
 
 def fetch_gauge_history(site_id: str, hours: int = 24,
-                         timeout: int = 20) -> list[tuple[str, float]]:
-    """Last N hours of stage readings as (iso_time, ft)."""
+                         timeout: int = 20,
+                         parameter_cd: str = "00065") -> list[tuple[str, float]]:
+    """Last N hours of stage readings as (iso_time, ft).
+
+    Pass ``parameter_cd="00062"`` for reservoirs, which report pool elevation
+    instead of river stage.
+    """
     try:
         r = requests.get(
             USGS_NWIS_URL,
             params={
                 "sites": site_id,
-                "parameterCd": "00065",
+                "parameterCd": parameter_cd,
                 "format": "json",
                 "period": f"PT{hours}H",
             },
@@ -355,13 +395,18 @@ def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
 
     def _one(entry):
         site_id, label, lat, lon, role = entry
+        is_reservoir = role in RESERVOIR_ROLES
         g = fetch_gauge(site_id, role=role)
-        hist = fetch_gauge_history(site_id, hours=hours_history)
+        # Reservoirs publish pool elevation (00062), not river stage (00065).
+        hist = fetch_gauge_history(
+            site_id, hours=hours_history,
+            parameter_cd="00062" if is_reservoir else "00065")
         rate = rate_of_rise_ft_per_hr(hist)
         t = thresholds_for(site_id)
         eta_minor = eta_moderate = eta_major = None
-        # ETAs are only meaningful against this site's own published stages.
-        if g and g.stage_ft is not None and t:
+        # ETAs are only meaningful against this site's own published stages,
+        # and never against a pool elevation.
+        if g and g.stage_ft is not None and t and not is_reservoir:
             def _eta(level):
                 target = t.get(level)
                 return (None if target is None
@@ -371,6 +416,7 @@ def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
         nwps = (fetch_nwps_forecast(site_id)
                 if site_id in NWPS_FORECAST_SITES else None)
         category = g.flood_category if g else "unknown"
+        pool = g.pool_elevation_ft if g else None
         return {
             "site_id": site_id,
             "label": label,
@@ -378,11 +424,17 @@ def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
             "lat": lat,
             "lon": lon,
             "stage_ft": g.stage_ft if g else None,
+            "pool_elevation_ft": pool,
+            # What the UI should print: river stage, or pool elevation for a
+            # reservoir. Units differ, so the label travels with the number.
+            "display_ft": pool if (g and g.stage_ft is None) else (g.stage_ft if g else None),
+            "display_units": "ft pool elev" if (g and g.stage_ft is None and pool is not None) else "ft",
             "discharge_cfs": g.discharge_cfs if g else None,
             "flood_category": category,
             "flood_class": flood_class(category),
             "thresholds": t,
-            "thresholds_label": format_thresholds(t),
+            "thresholds_label": format_thresholds(
+                t, units="ft pool elev" if is_reservoir else "ft"),
             "timestamp": g.timestamp if g else "",
             "rate_ft_per_hr": rate,
             "history": [{"t": t_, "ft": v} for t_, v in hist[-96:]],

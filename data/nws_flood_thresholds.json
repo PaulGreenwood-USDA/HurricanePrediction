@@ -1,6 +1,6 @@
 {
   "_source": "NWS National Water Prediction Service, api.water.noaa.gov/nwps/v1",
-  "_generated": "2026-08-10T12:00:17Z",
+  "_generated": "2026-08-10T13:12:16Z",
   "_regenerate_with": "uv run python scripts/refresh_flood_thresholds.py",
   "_note": "Stages are in feet on each gauge's own datum. Sites absent from this table have no NWS forecast point and must not be classified against another gauge's thresholds.",
   "sites": {
@@ -15,25 +15,25 @@
       "units": "ft",
       "usgs_label": "Tar River @ Tarboro"
     },
-    "0208732885": {
-      "action": 8.0,
-      "minor": 9.0,
-      "moderate": 12.0,
-      "major": null,
-      "record": 13.33,
-      "lid": "MSHN7",
-      "nws_name": "Marsh Creek (NC) at New Hope",
+    "02087182": {
+      "action": 264.0,
+      "minor": 265.0,
+      "moderate": 266.0,
+      "major": 267.0,
+      "record": null,
+      "lid": "NUDN7",
+      "nws_name": "Neuse River at Falls Lake",
       "units": "ft",
-      "usgs_label": "Falls Lake @ Falls Dam"
+      "usgs_label": "Falls Lake above dam"
     },
-    "02089000": {
-      "action": 17.0,
-      "minor": 18.0,
-      "moderate": 20.0,
-      "major": 24.0,
-      "record": 29.74,
-      "lid": "GLDN7",
-      "nws_name": "Neuse River near Goldsboro",
+    "02089500": {
+      "action": 13.0,
+      "minor": 14.0,
+      "moderate": 18.0,
+      "major": 21.0,
+      "record": 28.31,
+      "lid": "KINN7",
+      "nws_name": "Neuse River at Kinston",
       "units": "ft",
       "usgs_label": "Neuse River @ Kinston"
     },
@@ -59,38 +59,38 @@
       "units": "ft",
       "usgs_label": "Trent River nr Trenton"
     },
-    "02096960": {
-      "action": 10.0,
-      "minor": 11.0,
-      "moderate": 15.0,
-      "major": 17.0,
-      "record": 23.2,
-      "lid": "BYNN7",
-      "nws_name": "Haw River near Bynum",
+    "02093000": {
+      "action": 13.0,
+      "minor": 14.0,
+      "moderate": 16.0,
+      "major": 22.0,
+      "record": 25.76,
+      "lid": "GUMN7",
+      "nws_name": "New River near Gum Branch",
       "units": "ft",
-      "usgs_label": "Jordan Lake @ Farrington"
+      "usgs_label": "New River nr Gum Branch"
     },
-    "02102000": {
-      "action": 8.0,
-      "minor": 9.0,
-      "moderate": 14.0,
-      "major": 18.0,
-      "record": 17.2,
-      "lid": "MONN7",
-      "nws_name": "Deep River near Moncure",
+    "02098197": {
+      "action": 240.0,
+      "minor": 240.0,
+      "moderate": 241.0,
+      "major": 242.0,
+      "record": null,
+      "lid": "NHPN7",
+      "nws_name": "Haw River at Jordan Lake",
+      "units": "ft",
+      "usgs_label": "Jordan Lake at dam nr Moncure"
+    },
+    "02102500": {
+      "action": 13.0,
+      "minor": 14.0,
+      "moderate": 19.0,
+      "major": 27.0,
+      "record": 33.19,
+      "lid": "LLLN7",
+      "nws_name": "Cape Fear River at Lillington",
       "units": "ft",
       "usgs_label": "Cape Fear River @ Lillington"
-    },
-    "02105500": {
-      "action": 41.0,
-      "minor": 42.0,
-      "moderate": 55.0,
-      "major": 65.0,
-      "record": 75.5,
-      "lid": "STPN7",
-      "nws_name": "Cape Fear River at W.O. Huske Lock",
-      "units": "ft",
-      "usgs_label": "Lumber River @ Boardman"
     },
     "02105769": {
       "action": 22.0,
@@ -103,14 +103,14 @@
       "units": "ft",
       "usgs_label": "Cape Fear River @ Lock 1 nr Kelly"
     },
-    "02118500": {
-      "action": 16.0,
+    "02116500": {
+      "action": 17.0,
       "minor": 18.0,
-      "moderate": 23.0,
-      "major": 27.0,
-      "record": 25.05,
-      "lid": "HUNN7",
-      "nws_name": "Hunting Creek below E Houstonville Rd. 3 NNE Harmony",
+      "moderate": 25.0,
+      "major": 29.0,
+      "record": 36.3,
+      "lid": "YADN7",
+      "nws_name": "Yadkin River at Yadkin College",
       "units": "ft",
       "usgs_label": "Yadkin River @ Yadkin College"
     },
@@ -135,28 +135,6 @@
       "nws_name": "Pee Dee River near Rockingham",
       "units": "ft",
       "usgs_label": "Pee Dee River nr Rockingham"
-    },
-    "02143040": {
-      "action": 19.0,
-      "minor": 20.0,
-      "moderate": 22.0,
-      "major": 24.0,
-      "record": 19.74,
-      "lid": "JFON7",
-      "nws_name": "Jacob Fork below Old NC 18 in Shoups Ford",
-      "units": "ft",
-      "usgs_label": "Lake Norman @ Marshall Steam Plt"
-    },
-    "02146000": {
-      "action": 13.0,
-      "minor": 15.0,
-      "moderate": 25.0,
-      "major": 30.0,
-      "record": 24.15,
-      "lid": "RHIS1",
-      "nws_name": "Catawba River above  Rock Hill",
-      "units": "ft",
-      "usgs_label": "Catawba River nr Charlotte (Mtn Is.)"
     },
     "02151500": {
       "action": 10.0,
@@ -224,16 +202,16 @@
       "units": "ft",
       "usgs_label": "French Broad @ Asheville"
     },
-    "03456500": {
-      "action": 7.0,
-      "minor": 8.5,
-      "moderate": 10.0,
-      "major": 12.0,
-      "record": 16.03,
-      "lid": "CEPN7",
-      "nws_name": "East Fork Pigeon River above Canton",
+    "03456991": {
+      "action": 8.0,
+      "minor": 10.0,
+      "moderate": 15.0,
+      "major": 19.0,
+      "record": 26.96,
+      "lid": "CTPN7",
+      "nws_name": "Pigeon River above Old River Rd (NC 215), 1 SW Canton",
       "units": "ft",
-      "usgs_label": "Pigeon River @ Canton"
+      "usgs_label": "Pigeon River nr Canton"
     },
     "03500000": {
       "action": 8.0,

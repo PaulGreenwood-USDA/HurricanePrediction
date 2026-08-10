@@ -67,6 +67,32 @@ def test_reservoir_role_without_thresholds_is_pool_stage():
     assert _classify(3.18, "99999999", role="reservoir") == "pool stage"
 
 
+def test_pool_elevation_uses_the_reservoirs_own_thresholds():
+    """NWS publishes Falls Lake's flood pool in the same elevation datum the
+    gauge reports, so ~249 ft against a 264 ft action pool is below action."""
+    if "02087182" not in FLOOD_STAGES_BY_SITE:
+        pytest.skip("Falls Lake thresholds not in store")
+    assert _classify(None, "02087182", role="reservoir",
+                     pool_elevation_ft=248.90) == "below action"
+    assert _classify(None, "02087182", role="reservoir",
+                     pool_elevation_ft=266.5) == "MODERATE FLOOD"
+
+
+def test_pool_elevation_without_thresholds_is_pool_stage():
+    assert _classify(None, "99999999", role="reservoir",
+                     pool_elevation_ft=248.90) == "pool stage"
+
+
+def test_pool_elevation_never_borrows_a_river_gauges_thresholds():
+    """The failure mode being guarded: ~249 ft of pool elevation measured
+    against Asheville's 18 ft major-flood stage reads as catastrophic."""
+    assert _classify(None, "99999999", pool_elevation_ft=248.90) != "MAJOR FLOOD"
+
+
+def test_no_reading_at_all_is_unknown():
+    assert _classify(None, ASH, pool_elevation_ft=None) == "unknown"
+
+
 def test_reservoir_role_still_uses_published_thresholds():
     """The role tag is a fallback label, not an override -- if NWS publishes
     flood stages for a site we must not suppress them."""

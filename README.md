@@ -178,10 +178,18 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
   major stages from
   [data/nws_flood_thresholds.json](data/nws_flood_thresholds.json). Gauges with
   no published NWS thresholds render as *no thresholds* rather than being
-  measured against another river's numbers, and reservoir gauges render as
-  *pool stage* because a lake has no river flood stage. Refresh the table with
+  measured against another river's numbers. Refresh the table with
   `uv run python scripts/refresh_flood_thresholds.py` (slow by design — NWPS
   allows 10 requests per 5 minutes).
+- **Reservoirs report pool elevation**, USGS parameter `00062`, not river stage
+  `00065` — Falls Lake reads ~249 ft against a 264 ft flood pool. NWS publishes
+  those thresholds in the same elevation datum, so reservoirs are classified
+  normally; the units travel with the number so a pool elevation is never shown
+  as a river stage.
+- **Gauge ids are pinned to their USGS station names** in
+  [tests/test_gauge_registry.py](tests/test_gauge_registry.py). Verify any new
+  site id against the USGS site service before adding it — a label and an id
+  that disagree will otherwise show one river's data under another's name.
 - HURDAT2 is cached in [data/hurdat2.txt](data/hurdat2.txt) and the elevation
   grid in [data/dem.npz](data/dem.npz) after first download.
 

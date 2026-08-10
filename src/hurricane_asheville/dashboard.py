@@ -725,7 +725,8 @@ PAGE = r"""
           <span class="dim">{{ g.role }} &middot; USGS {{ g.site_id }}</span>
         </div>
         <div style="text-align:right;">
-          <div><b>{{ "%.2f"|format(g.stage_ft) if g.stage_ft is not none else "?" }}</b> ft</div>
+          <div><b>{{ "%.2f"|format(g.display_ft) if g.display_ft is not none else "?" }}</b>
+               <span class="dim" style="font-size:.78rem;">{{ g.display_units or "ft" }}</span></div>
           {% if g.rate_ft_per_hr is not none %}
             {% if g.rate_ft_per_hr > 0.05 %}
               <span class="dim rate-up">&uarr; {{ "%.2f"|format(g.rate_ft_per_hr) }} ft/hr</span>
@@ -1576,7 +1577,10 @@ PAGE = r"""
       Math.abs(r).toFixed(2) + ' ft/hr';
     m.bindPopup(
       '<b>' + g.label + '</b><br>' +
-      'Stage: ' + (g.stage_ft != null ? g.stage_ft.toFixed(2) + ' ft' : 'n/a') + '<br>' +
+      (g.display_ft != null
+        ? (g.pool_elevation_ft != null && g.stage_ft == null ? 'Pool: ' : 'Stage: ') +
+          g.display_ft.toFixed(2) + ' ' + (g.display_units || 'ft') + '<br>'
+        : 'Stage: n/a<br>') +
       'Rate: ' + rateStr + '<br>' +
       'Cat: ' + g.flood_category + '<br>' +
       '<small>USGS ' + g.site_id + '</small>');
