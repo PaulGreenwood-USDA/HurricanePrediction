@@ -1,8 +1,8 @@
 {
   "target_id": "03451500",
-  "horizon_h": 6,
+  "horizon_h": 72,
   "kind": "classification",
-  "target_col": "y_peak_above_8.0_6h",
+  "target_col": "y_peak_above_9.5_72h",
   "feature_cols": [
     "self__stage_ft",
     "self__stage_ft__lag1",
@@ -91,45 +91,45 @@
   "metrics": {
     "per_fold": [
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 1
       },
       {
-        "n": 7014,
-        "auc": 0.5881329655973291,
-        "ap": 0.5901030688208881,
-        "positive_rate": 0.017821499857428,
+        "n": 7301,
+        "auc": 0.5,
+        "ap": 0.022873578961786056,
+        "positive_rate": 0.022873578961786056,
         "fold": 2
       },
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7016,
+        "n": 7304,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 4
       }
     ],
-    "overall_auc": 0.5881329655973291,
+    "overall_auc": 0.5,
     "n_folds": 5
   },
-  "n_train_rows": 43839,
-  "trained_ts": "2026-05-27T14:33:59.890193+00:00",
-  "threshold": 8.0
+  "n_train_rows": 45635,
+  "trained_ts": "2026-08-10T14:01:56.645139+00:00",
+  "threshold": 9.5
 }

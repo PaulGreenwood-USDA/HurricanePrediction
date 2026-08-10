@@ -2,7 +2,7 @@
   "target_id": "03451500",
   "horizon_h": 72,
   "kind": "classification",
-  "target_col": "y_peak_above_12.0_72h",
+  "target_col": "y_peak_above_13.0_72h",
   "feature_cols": [
     "self__stage_ft",
     "self__stage_ft__lag1",
@@ -91,35 +91,35 @@
   "metrics": {
     "per_fold": [
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 1
       },
       {
-        "n": 7014,
+        "n": 7301,
         "auc": 0.5,
-        "ap": 0.020387795836897635,
-        "positive_rate": 0.020387795836897635,
+        "ap": 0.019586358033146144,
+        "positive_rate": 0.019586358033146144,
         "fold": 2
       },
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7016,
+        "n": 7304,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
@@ -129,7 +129,7 @@
     "overall_auc": 0.5,
     "n_folds": 5
   },
-  "n_train_rows": 43839,
-  "trained_ts": "2026-05-27T14:34:32.996665+00:00",
-  "threshold": 12.0
+  "n_train_rows": 45635,
+  "trained_ts": "2026-08-10T14:02:01.805646+00:00",
+  "threshold": 13.0
 }

@@ -1,0 +1,147 @@
+<div class="card span12">
+    <h2>NC National Forests</h2>
+    <div class="forest-grid">
+      {% for f in data.forests %}
+        <div class="forest region-{{ f.region }}">
+          <h3>{{ f.name }}</h3>
+          <div class="meta">{{ "{:,}".format(f.acres) }} ac &middot; est. {{ f.established }} &middot;
+                            HQ {{ f.hq_city }} &middot; {{ f.region }}</div>
+          <div class="stats">
+            {% if f.weather and not f.weather.error %}
+              <span>Temp</span><span>{{ f.weather.temp_f }}&deg;F</span>
+              <span>72h precip</span><span><b>{{ f.weather.next_72h_precip_in }} in</b></span>
+              <span>Wind</span><span>{{ f.weather.wind_mph }} mph</span>
+              <span>RH</span><span>{{ f.weather.humidity_pct }}%</span>
+            {% else %}
+              <span>Weather</span><span class="dim">unavailable</span>
+            {% endif %}
+            {% if f.nearest_storm %}
+              <span>Nearest TC</span>
+              <span><b>{{ f.nearest_storm }}</b> {{ f.nearest_storm_mi|round(0)|int }} mi</span>
+            {% endif %}
+            <span>Districts</span><span>{{ f.districts|join(', ') }}</span>
+          </div>
+
+          {% if f.landslide %}
+            <div class="forest-landslide" title="{{ f.landslide.explain }}">
+              <span class="ll-pill" style="background: {{ f.landslide.color }}">
+                Landslide: {{ f.landslide.label }} ({{ f.landslide.score }})
+              </span>
+              {% if f.landslide.inventory and f.landslide.inventory.count %}
+                <span class="ll-inv">{{ f.landslide.inventory.count }} historical event{{ '' if f.landslide.inventory.count == 1 else 's' }} within 25 mi{% if f.landslide.inventory.most_recent_year %} (latest {{ f.landslide.inventory.most_recent_year }}){% endif %}</span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if f.fire_weather %}
+            <div class="forest-landslide" title="{{ f.fire_weather.explain }}">
+              <span class="ll-pill" style="background: {{ f.fire_weather.color }}">
+                Fire wx: {{ f.fire_weather.label }} ({{ f.fire_weather.score }})
+              </span>
+              {% if f.fires_summary and f.fires_summary.count %}
+                <span class="ll-inv">
+                  {{ f.fires_summary.count }} active fire{{ '' if f.fires_summary.count == 1 else 's' }} within 50 mi
+                  ({{ "{:,.0f}".format(f.fires_summary.total_acres) }} ac{% if f.fires_summary.min_contained_pct is not none %}, min {{ f.fires_summary.min_contained_pct|int }}% contained{% endif %})
+                </span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if f.air_quality and not f.air_quality.error and f.air_quality.us_aqi is not none %}
+            <div class="forest-landslide">
+              <span class="ll-pill" style="background: {{ f.air_quality.color }}">
+                AQI: {{ f.air_quality.label }} ({{ f.air_quality.us_aqi|int }})
+              </span>
+              {% if f.air_quality.pm2_5 is not none %}
+                <span class="ll-inv">PM2.5 {{ f.air_quality.pm2_5 }} &micro;g/m&sup3;</span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if f.gauges %}
+            <div class="forest-gauges">
+              <div class="ll-section-title">Nearby USGS gauges</div>
+              {% for g in f.gauges %}
+                <div class="forest-gauge">
+                  <span class="fg-name">{{ g.label }}</span>
+                  <span class="fg-stage">
+                    {% if g.stage_ft is not none %}{{ "%.2f"|format(g.stage_ft) }} ft{% else %}?{% endif %}
+                    {% if g.rate_ft_per_hr is not none and g.rate_ft_per_hr > 0.05 %}
+                      <span class="rate-up">&uarr;</span>
+                    {% elif g.rate_ft_per_hr is not none and g.rate_ft_per_hr < -0.05 %}
+                      <span class="rate-down">&darr;</span>
+                    {% endif %}
+                  </span>
+                  <span class="stage-pill {{ g.flood_class }}">
+                    {{ g.flood_category }}
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if f.alerts %}
+            {% for a in f.alerts[:2] %}
+              <span class="alert-mini">{{ a.event }}</span>
+            {% endfor %}
+          {% endif %}
+          {% if f.nearest_storm_mi is not none and f.nearest_storm_mi < 300 %}
+            <span class="storm-near">!! TC within 300 mi !!</span>
+          {% endif %}
+          <div class="dim" style="margin-top:.4rem; font-size:.74rem;">{{ f.notes }}</div>
+
+          {% if f.districts_data %}
+            <div class="ll-section-title" style="margin-top:.6rem;">Ranger districts</div>
+            <div class="districts">
+              {% for d in f.districts_data %}
+                <div class="district">
+                  <h4>{{ d.name }} RD</h4>
+                  <div class="d-meta">Office: {{ d.office }}</div>
+                  <div class="d-stats">
+                    {% if d.weather and not d.weather.error %}
+                      <span>Temp</span><span>{{ d.weather.temp_f }}&deg;F</span>
+                      <span>72h precip</span><span><b>{{ d.weather.next_72h_precip_in }} in</b></span>
+                      <span>Wind</span><span>{{ d.weather.wind_mph }} mph</span>
+                      <span>RH</span><span>{{ d.weather.humidity_pct }}%</span>
+                    {% else %}
+                      <span>Weather</span><span class="dim">unavailable</span>
+                    {% endif %}
+                  </div>
+                  <div class="d-pills">
+                    {% if d.landslide %}
+                      <span class="d-pill" style="background: {{ d.landslide.color }}"
+                            title="{{ d.landslide.explain }}">
+                        Slide {{ d.landslide.label }} ({{ d.landslide.score }})
+                      </span>
+                    {% endif %}
+                    {% if d.fire_weather %}
+                      <span class="d-pill" style="background: {{ d.fire_weather.color }}"
+                            title="{{ d.fire_weather.explain }}">
+                        Fire {{ d.fire_weather.label }} ({{ d.fire_weather.score }})
+                      </span>
+                    {% endif %}
+                    {% if d.air_quality and not d.air_quality.error and d.air_quality.us_aqi is not none %}
+                      <span class="d-pill" style="background: {{ d.air_quality.color }}">
+                        AQI {{ d.air_quality.label }} ({{ d.air_quality.us_aqi|int }})
+                      </span>
+                    {% endif %}
+                    {% if d.fires_summary and d.fires_summary.count %}
+                      <span class="d-pill" style="background:#ff3d00">
+                        {{ d.fires_summary.count }} fire{{ '' if d.fires_summary.count == 1 else 's' }}
+                      </span>
+                    {% endif %}
+                    {% if d.alerts %}
+                      <span class="d-pill" style="background:#b71c1c">
+                        {{ d.alerts|length }} alert{{ '' if d.alerts|length == 1 else 's' }}
+                      </span>
+                    {% endif %}
+                  </div>
+                  <div class="d-notes">{{ d.notes }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>

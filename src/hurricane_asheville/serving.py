@@ -25,6 +25,7 @@ working even before the first ``ml-train`` has been run.
 """
 from __future__ import annotations
 
+import json
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -101,3 +102,78 @@ def forecast_all(history_df, *, base_dir: Path | str = DEFAULT_MODELS_DIR,
         block["classification"].sort(
             key=lambda r: (r["horizon_h"], r["threshold"] or 0.0))
     return dict(grouped)
+
+
+# ---- accuracy metadata ----------------------------------------------------
+
+# A classifier whose positive class appears in only one walk-forward fold has
+# not been validated -- it has been shown one flood. The dashboard needs to say
+# so rather than print a confident-looking percentage.
+MIN_FOLDS_WITH_EVENTS = 2
+
+
+def load_model_metrics(target_id: str,
+                       *, base_dir: Path | str = DEFAULT_MODELS_DIR) -> dict:
+    """Backtest metrics for one gauge's models, keyed for the dashboard.
+
+    Reads the sidecar JSON written next to each ``.joblib`` at training time.
+    These ship with the repo, unlike the ``site/ml`` plots, which are only
+    produced by an explicit ``ml-backtest`` run.
+
+    Keys look like ``regression_h24`` and ``classification_thr9.5_h24``.
+    """
+    base = Path(base_dir) / target_id
+    if not base.exists():
+        return {}
+
+    out: dict[str, dict] = {}
+    for path in sorted(base.glob("*.json")):
+        try:
+            meta = json.loads(path.read_text())
+        except (OSError, ValueError) as exc:  # noqa: PERF203
+            log.warning("serving: unreadable model sidecar %s: %s", path, exc)
+            continue
+        kind = meta.get("kind")
+        horizon = meta.get("horizon_h")
+        metrics = meta.get("metrics") or {}
+        folds = metrics.get("per_fold") or []
+        common = {
+            "kind": kind,
+            "horizon_h": horizon,
+            "n_folds": metrics.get("n_folds") or len(folds),
+            "n_train_rows": meta.get("n_train_rows"),
+            "trained_ts": meta.get("trained_ts"),
+        }
+
+        if kind == "regression":
+            out[f"regression_h{horizon}"] = {
+                **common,
+                "mae": metrics.get("overall_mae"),
+                "trustworthy": metrics.get("overall_mae") is not None,
+            }
+        elif kind == "classification":
+            threshold = meta.get("threshold")
+            # Count how much of a positive class the backtest actually saw.
+            positives = 0
+            folds_with_events = 0
+            for f in folds:
+                rate = f.get("positive_rate") or 0.0
+                n = f.get("n") or 0
+                count = round(rate * n)
+                positives += count
+                if count:
+                    folds_with_events += 1
+            auc = metrics.get("overall_auc")
+            # 0.5 is what the metric code emits when AUC is undefined.
+            auc_meaningful = auc is not None and abs(auc - 0.5) > 1e-9
+            out[f"classification_thr{threshold}_h{horizon}"] = {
+                **common,
+                "threshold": threshold,
+                "auc": auc if auc_meaningful else None,
+                "positive_events": positives,
+                "folds_with_events": folds_with_events,
+                "trustworthy": bool(
+                    auc_meaningful
+                    and folds_with_events >= MIN_FOLDS_WITH_EVENTS),
+            }
+    return out

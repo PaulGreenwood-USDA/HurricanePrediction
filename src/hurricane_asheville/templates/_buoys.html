@@ -1,0 +1,45 @@
+<div class="card span12">
+    <h2>NOAA NDBC offshore buoys + C-MAN (hurricane lead-time)</h2>
+    {% if data.buoys %}
+      <div class="scroll-x">
+      <table>
+        <tr>
+          <th>Station</th><th>Seas</th><th>Wave (ft / s)</th>
+          <th>Wind (kt)</th><th>Pressure (mb)</th><th>Water (&deg;F)</th>
+        </tr>
+        {% for b in data.buoys %}
+        <tr>
+          <td>
+            <b>{{ b.label }}</b>
+            <br><span class="dim" style="font-size:.7rem;">{{ b.role }} &middot; NDBC {{ b.station_id }}</span>
+          </td>
+          <td>
+            <span class="ll-pill" style="background: {{ b.color }}">{{ b.seas }}</span>
+          </td>
+          <td>
+            {% if b.wave_ht_ft is not none %}
+              {{ "%.1f"|format(b.wave_ht_ft) }} ft
+              {% if b.dominant_period_s %} / {{ "%.0f"|format(b.dominant_period_s) }} s{% endif %}
+            {% else %}?{% endif %}
+          </td>
+          <td>
+            {% if b.wind_kt is not none %}
+              {{ "%.0f"|format(b.wind_kt) }}
+              {% if b.wind_gust_kt %} (g {{ "%.0f"|format(b.wind_gust_kt) }}){% endif %}
+              {% if b.wind_dir_deg is not none %} @ {{ b.wind_dir_deg|round(0)|int }}&deg;{% endif %}
+            {% else %}?{% endif %}
+          </td>
+          <td>{{ "%.1f"|format(b.pressure_mb) if b.pressure_mb is not none else "?" }}</td>
+          <td>{{ "%.1f"|format(b.water_temp_f) if b.water_temp_f is not none else "?" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      </div>
+      <div class="dim" style="margin-top:.4rem;">
+        Wave height &amp; long-period swell at Diamond Shoals / Frying Pan Shoals are
+        the canonical 12-24h leading indicators of a TC approaching the NC coast.
+      </div>
+    {% else %}
+      <div class="dim">NDBC feed unavailable</div>
+    {% endif %}
+  </div>

@@ -93,11 +93,39 @@ def test_index_route_returns_html(client):
     assert "Flood Index" in body or "flood index" in body.lower()
 
 
-def test_page_declares_mobile_viewport():
+def test_page_declares_mobile_viewport(client):
     """Without this the page falls back to a 980px viewport and renders
     zoomed-out on phones -- the primary device during a flood event."""
-    assert 'name="viewport"' in dashboard.PAGE
-    assert "width=device-width" in dashboard.PAGE
+    body = client.get("/").get_data(as_text=True)
+    assert 'name="viewport"' in body
+    assert "width=device-width" in body
+
+
+def test_page_links_external_css_and_js(client):
+    """Markup, styles and script are separate files now; a regression back to
+    one inline blob would make the state payload ship twice again."""
+    body = client.get("/").get_data(as_text=True)
+    assert "dashboard.css" in body
+    assert "dashboard.js" in body
+    assert "const STATE = {" not in body
+
+
+def test_map_payload_excludes_gauge_history(client, fake_state):
+    """The map never reads per-gauge history; inlining it doubled page size."""
+    fake_state["gauges"] = [
+        {"site_id": "03451500", "label": "French Broad @ Asheville",
+         "role": "primary", "lat": 35.6, "lon": -82.6, "stage_ft": 1.67,
+         "display_ft": 1.67, "display_units": "ft", "pool_elevation_ft": None,
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": None, "thresholds_label": "", "rate_ft_per_hr": 0.0,
+         "history": [{"t": f"2026-08-10T{h:02d}:00", "ft": 1.6} for h in range(24)],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+    ]
+    payload = dashboard.map_state(fake_state)
+    assert payload["gauges"][0]["site_id"] == "03451500"
+    assert "history" not in payload["gauges"][0]
+    assert "nwps_forecast" not in payload["gauges"][0]
 
 
 def test_stage_pills_use_single_token_classes(client, fake_state):

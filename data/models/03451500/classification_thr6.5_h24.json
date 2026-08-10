@@ -2,7 +2,7 @@
   "target_id": "03451500",
   "horizon_h": 24,
   "kind": "classification",
-  "target_col": "y_peak_above_12.0_24h",
+  "target_col": "y_peak_above_6.5_24h",
   "feature_cols": [
     "self__stage_ft",
     "self__stage_ft__lag1",
@@ -91,45 +91,45 @@
   "metrics": {
     "per_fold": [
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7014,
-        "auc": null,
-        "ap": null,
-        "positive_rate": 0.0,
+        "n": 7301,
+        "auc": 0.9988311612413068,
+        "ap": 0.9018748312860195,
+        "positive_rate": 0.009724695247226408,
         "fold": 1
       },
       {
-        "n": 7014,
-        "auc": 0.5,
-        "ap": 0.013544339891645281,
-        "positive_rate": 0.013544339891645281,
+        "n": 7301,
+        "auc": 0.9935960937637383,
+        "ap": 0.8896608256139956,
+        "positive_rate": 0.019586358033146144,
         "fold": 2
       },
       {
-        "n": 7014,
+        "n": 7301,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7016,
+        "n": 7304,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 4
       }
     ],
-    "overall_auc": 0.5,
+    "overall_auc": 0.9962136275025225,
     "n_folds": 5
   },
-  "n_train_rows": 43839,
-  "trained_ts": "2026-05-27T14:34:17.230741+00:00",
-  "threshold": 12.0
+  "n_train_rows": 45635,
+  "trained_ts": "2026-08-10T14:01:14.135005+00:00",
+  "threshold": 6.5
 }
