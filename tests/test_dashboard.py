@@ -93,6 +93,32 @@ def test_index_route_returns_html(client):
     assert "Flood Index" in body or "flood index" in body.lower()
 
 
+def test_page_declares_mobile_viewport():
+    """Without this the page falls back to a 980px viewport and renders
+    zoomed-out on phones -- the primary device during a flood event."""
+    assert 'name="viewport"' in dashboard.PAGE
+    assert "width=device-width" in dashboard.PAGE
+
+
+def test_stage_pills_use_single_token_classes(client, fake_state):
+    """Regression: the template derived pill classes by munging the label,
+    so 'below action' produced class="stage-pill below action" and matched
+    the '.stage-pill.action' rule -- every safe gauge looked like a warning."""
+    fake_state["gauges"] = [
+        {"site_id": "03451500", "label": "French Broad @ Asheville",
+         "role": "primary", "lat": 35.6, "lon": -82.6, "stage_ft": 1.67,
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": {"action": 7.0, "minor": 9.5,
+                        "moderate": 12.0, "major": 16.0},
+         "rate_ft_per_hr": 0.0, "history": [],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+    ]
+    body = client.get("/").get_data(as_text=True)
+    assert 'class="stage-pill below-action"' in body
+    assert 'class="stage-pill below action"' not in body
+
+
 def test_api_state_returns_json(client, fake_state):
     resp = client.get("/api/state")
     assert resp.status_code == 200

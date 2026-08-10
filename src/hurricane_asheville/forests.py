@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from .gauge import (fetch_gauge, fetch_gauge_history, fetch_nws_alerts,
-                    rate_of_rise_ft_per_hr)
+                    flood_class, rate_of_rise_ft_per_hr)
 from .geo import haversine_mi
 from .landslide import (compute_landslide_hazard, fetch_nearby_landslides,
                         summarize_inventory)
@@ -180,9 +180,10 @@ def _gauges_for(forest_short: str) -> list[dict]:
 
     def _one(entry):
         site_id, label, lat, lon, role = entry
-        g = fetch_gauge(site_id)
+        g = fetch_gauge(site_id, role=role)
         hist = fetch_gauge_history(site_id, hours=12)
         rate = rate_of_rise_ft_per_hr(hist)
+        category = g.flood_category if g else "unknown"
         return {
             "site_id": site_id,
             "label": label,
@@ -190,7 +191,8 @@ def _gauges_for(forest_short: str) -> list[dict]:
             "lat": lat,
             "lon": lon,
             "stage_ft": g.stage_ft if g else None,
-            "flood_category": g.flood_category if g else "unknown",
+            "flood_category": category,
+            "flood_class": flood_class(category),
             "rate_ft_per_hr": rate,
         }
 

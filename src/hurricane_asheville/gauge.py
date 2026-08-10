@@ -5,17 +5,28 @@ Site 03451500 = French Broad River at Asheville, NC.
   - 00060: discharge, cubic feet per second
   - 00065: gage height, feet
 
-NWS AHPS flood thresholds for this site (current as of 2025):
-  Action  :  7.0 ft
-  Minor   :  9.5 ft   (formal flood stage)
-  Moderate: 12.0 ft
-  Major   : 16.0 ft
-  Record  : 23.10 ft  (1916 flood; Helene 2024 reached ~24.7 ft preliminary)
+Flood thresholds are **per site**. Every gauge sits on a different datum, so
+Asheville's 9.5 ft "minor flood" means nothing on the Cape Fear at Lock 1,
+whose ordinary fair-weather stage is higher than that. Thresholds come from
+the NWS National Water Prediction Service and are baked into
+``data/nws_flood_thresholds.json`` -- NWPS rate-limits to 10 requests per
+5 minutes, which a 20-gauge refresh would blow instantly.
+
+Regenerate that file with::
+
+    uv run python scripts/refresh_flood_thresholds.py
+
+Sites with no published NWS thresholds are classified ``"no thresholds"``
+rather than being measured against some other river's numbers. Guessing is
+worse than saying nothing on a flood dashboard.
 """
 from __future__ import annotations
 
+import json
 import logging
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
 
 import requests
 
@@ -24,6 +35,11 @@ log = logging.getLogger(__name__)
 USGS_NWIS_URL = "https://waterservices.usgs.gov/nwis/iv/"
 SITE_FRENCH_BROAD_ASHEVILLE = "03451500"
 
+THRESHOLDS_PATH = Path(__file__).resolve().parents[2] / "data" / "nws_flood_thresholds.json"
+
+# French Broad @ Asheville, kept as a module constant because the Flood Index,
+# the CLI stage bar and the ML forecast card are all specifically about this
+# one site. Overwritten from the JSON store below when it is present.
 FLOOD_STAGES_FT = {
     "action": 7.0,
     "minor": 9.5,
@@ -31,6 +47,59 @@ FLOOD_STAGES_FT = {
     "major": 16.0,
     "record": 23.10,
 }
+
+
+def _load_thresholds() -> dict[str, dict]:
+    """Per-USGS-site NWS flood thresholds, keyed by site id.
+
+    Returns an empty mapping if the store is missing or unreadable; callers
+    degrade to "no thresholds" rather than to another site's numbers.
+    """
+    try:
+        raw = json.loads(THRESHOLDS_PATH.read_text())
+    except FileNotFoundError:
+        log.warning("flood threshold store not found at %s; gauges will be "
+                    "reported without flood categories", THRESHOLDS_PATH)
+        return {}
+    except (OSError, ValueError) as exc:
+        log.warning("flood threshold store unreadable (%s): %s",
+                    THRESHOLDS_PATH, exc)
+        return {}
+    sites: dict[str, dict] = {}
+    for site_id, entry in (raw.get("sites") or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        # Defence in depth: NWPS writes -9999 for "level not defined". If one
+        # ever survives into the store, every reading would exceed it and the
+        # gauge would report MAJOR FLOOD forever.
+        clean = dict(entry)
+        for level in ("action", "minor", "moderate", "major", "record"):
+            v = clean.get(level)
+            if isinstance(v, (int, float)) and v <= -999:
+                log.warning("dropping sentinel %s=%s for site %s", level, v, site_id)
+                clean[level] = None
+        sites[site_id] = clean
+    return sites
+
+
+FLOOD_STAGES_BY_SITE: dict[str, dict] = _load_thresholds()
+
+if SITE_FRENCH_BROAD_ASHEVILLE in FLOOD_STAGES_BY_SITE:
+    # Merge over the defaults rather than replacing them: index_score, the CLI
+    # stage bar and the ML card all index this dict directly, so every key has
+    # to stay present even if NWPS omits a level.
+    _ash = FLOOD_STAGES_BY_SITE[SITE_FRENCH_BROAD_ASHEVILLE]
+    FLOOD_STAGES_FT = {
+        **FLOOD_STAGES_FT,
+        **{k: float(_ash[k])
+           for k in ("action", "minor", "moderate", "major", "record")
+           if _ash.get(k) is not None},
+    }
+
+# Gauges measuring reservoir pool elevation rather than river stage. A lake
+# has no NWS flood stage in the river sense, so classifying it against one
+# would be meaningless.
+RESERVOIR_ROLES = {"reservoir"}
 
 # Upstream / nearby gauges that give early warning (hours of lead-time on Asheville).
 # (site_id, label, lat, lon, role)
@@ -72,24 +141,77 @@ class GaugeReading:
     flood_category: str
     pct_to_minor: float | None
     pct_to_major: float | None
+    flood_class: str = "unknown"
+    thresholds: dict | None = field(default=None)
 
 
-def _classify(stage_ft: float | None) -> str:
+# Display label -> CSS class. The template used to derive this by string
+# munging the label, which turned "below action" into the two classes
+# "below" and "action" and painted every safe gauge in action-stage yellow.
+_FLOOD_CLASS = {
+    "MAJOR FLOOD":    "major",
+    "MODERATE FLOOD": "moderate",
+    "MINOR FLOOD":    "minor",
+    "action stage":   "action",
+    "below action":   "below-action",
+    "pool stage":     "pool",
+    "no thresholds":  "no-thresholds",
+    "unknown":        "unknown",
+}
+
+
+def flood_class(category: str) -> str:
+    """CSS-safe single-token slug for a flood category label."""
+    return _FLOOD_CLASS.get(category, "unknown")
+
+
+def thresholds_for(site_id: str) -> dict | None:
+    """Published NWS flood thresholds for a USGS site, or None if we have none."""
+    return FLOOD_STAGES_BY_SITE.get(site_id)
+
+
+def format_thresholds(t: dict | None) -> str:
+    """Human-readable threshold summary for a tooltip.
+
+    Skips levels NWS leaves undefined at a gauge, so the UI never shows
+    "moderate None ft".
+    """
+    if not t:
+        return ""
+    parts = [f"{level} {t[level]:g} ft"
+             for level in ("action", "minor", "moderate", "major")
+             if t.get(level) is not None]
+    return "NWS flood stages here: " + ", ".join(parts) if parts else ""
+
+
+def _classify(stage_ft: float | None,
+              site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
+              role: str | None = None) -> str:
+    """Classify a stage reading against *that site's* NWS thresholds.
+
+    Never falls back to another site's thresholds: a gauge we have no
+    published numbers for is reported as "no thresholds", not as safe.
+    """
     if stage_ft is None:
         return "unknown"
-    if stage_ft >= FLOOD_STAGES_FT["major"]:
-        return "MAJOR FLOOD"
-    if stage_ft >= FLOOD_STAGES_FT["moderate"]:
-        return "MODERATE FLOOD"
-    if stage_ft >= FLOOD_STAGES_FT["minor"]:
-        return "MINOR FLOOD"
-    if stage_ft >= FLOOD_STAGES_FT["action"]:
-        return "action stage"
+    t = FLOOD_STAGES_BY_SITE.get(site_id)
+    if not t:
+        # Only a fallback: if NWS publishes flood stages for a site we use
+        # them, whatever role the site is tagged with.
+        return "pool stage" if role in RESERVOIR_ROLES else "no thresholds"
+    for level, label in (("major", "MAJOR FLOOD"),
+                         ("moderate", "MODERATE FLOOD"),
+                         ("minor", "MINOR FLOOD"),
+                         ("action", "action stage")):
+        v = t.get(level)
+        if v is not None and stage_ft >= v:
+            return label
     return "below action"
 
 
 def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
-                timeout: int = 20) -> GaugeReading | None:
+                timeout: int = 20,
+                role: str | None = None) -> GaugeReading | None:
     """Pull the latest stage + discharge from USGS NWIS."""
     try:
         r = requests.get(
@@ -134,15 +256,25 @@ def fetch_gauge(site_id: str = SITE_FRENCH_BROAD_ASHEVILLE,
         elif code == "00060":
             discharge = v
 
+    t = thresholds_for(site_id)
+    category = _classify(stage, site_id=site_id, role=role)
+
+    def _pct(level: str) -> float | None:
+        if stage is None or not t or not t.get(level):
+            return None
+        return 100.0 * stage / t[level]
+
     return GaugeReading(
         site_id=site_id,
         site_name=site_name,
         timestamp=timestamp,
         stage_ft=stage,
         discharge_cfs=discharge,
-        flood_category=_classify(stage),
-        pct_to_minor=None if stage is None else 100.0 * stage / FLOOD_STAGES_FT["minor"],
-        pct_to_major=None if stage is None else 100.0 * stage / FLOOD_STAGES_FT["major"],
+        flood_category=category,
+        pct_to_minor=_pct("minor"),
+        pct_to_major=_pct("major"),
+        flood_class=flood_class(category),
+        thresholds=t,
     )
 
 
@@ -223,15 +355,22 @@ def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
 
     def _one(entry):
         site_id, label, lat, lon, role = entry
-        g = fetch_gauge(site_id)
+        g = fetch_gauge(site_id, role=role)
         hist = fetch_gauge_history(site_id, hours=hours_history)
         rate = rate_of_rise_ft_per_hr(hist)
+        t = thresholds_for(site_id)
         eta_minor = eta_moderate = eta_major = None
-        if g and g.stage_ft is not None and site_id == SITE_FRENCH_BROAD_ASHEVILLE:
-            eta_minor    = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["minor"], rate)
-            eta_moderate = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["moderate"], rate)
-            eta_major    = eta_to_stage_hours(g.stage_ft, FLOOD_STAGES_FT["major"], rate)
-        nwps = fetch_nwps_forecast(site_id) if site_id in NWS_LID_FOR_USGS else None
+        # ETAs are only meaningful against this site's own published stages.
+        if g and g.stage_ft is not None and t:
+            def _eta(level):
+                target = t.get(level)
+                return (None if target is None
+                        else eta_to_stage_hours(g.stage_ft, target, rate))
+            eta_minor, eta_moderate, eta_major = (
+                _eta("minor"), _eta("moderate"), _eta("major"))
+        nwps = (fetch_nwps_forecast(site_id)
+                if site_id in NWPS_FORECAST_SITES else None)
+        category = g.flood_category if g else "unknown"
         return {
             "site_id": site_id,
             "label": label,
@@ -240,10 +379,13 @@ def fetch_all_gauges(hours_history: int = 24) -> list[dict]:
             "lon": lon,
             "stage_ft": g.stage_ft if g else None,
             "discharge_cfs": g.discharge_cfs if g else None,
-            "flood_category": g.flood_category if g else "unknown",
+            "flood_category": category,
+            "flood_class": flood_class(category),
+            "thresholds": t,
+            "thresholds_label": format_thresholds(t),
             "timestamp": g.timestamp if g else "",
             "rate_ft_per_hr": rate,
-            "history": [{"t": t, "ft": v} for t, v in hist[-96:]],
+            "history": [{"t": t_, "ft": v} for t_, v in hist[-96:]],
             "eta_minor_hr": eta_minor,
             "eta_moderate_hr": eta_moderate,
             "eta_major_hr": eta_major,
@@ -288,43 +430,73 @@ def fetch_nws_alerts(lat: float, lon: float, timeout: int = 20) -> list[dict]:
 
 # ---- NWS National Water Prediction Service forecast traces -----------------
 
-# Mapping from USGS site ID to NWS gauge ID (NWSLI / lid). NWPS uses NWS IDs,
-# not USGS IDs, for forecast traces.  Lookups: https://water.noaa.gov/
-NWS_LID_FOR_USGS = {
-    "03451500": "ASHN7",   # French Broad @ Asheville
-    "03451000": "BLTN7",   # Swannanoa @ Biltmore
-    "03456500": "CTON7",   # Pigeon @ Canton
-    "02151500": "BAVN7",   # Broad nr Bat Cave
-    "03512000": "BDTN7",   # Oconaluftee @ Birdtown
-    "03513000": "BRYN7",   # Tuckasegee @ Bryson City
-}
-
+# NWPS resolves USGS site ids directly on /v1/gauges/{id}, so no NWSLI lookup
+# table is needed. The one this replaced was also wrong -- ASHN7 and CTON7 are
+# not valid NWPS ids, so the primary Asheville gauge never rendered a forecast.
 NWPS_FORECAST_URL = (
-    "https://api.water.noaa.gov/nwps/v1/gauges/{lid}/stageflow/forecast"
+    "https://api.water.noaa.gov/nwps/v1/gauges/{ident}/stageflow/forecast"
 )
+
+# Sites we pull forecast traces for. Deliberately minimal: NWPS allows only
+# 10 requests per 5 minutes *per client*, and the dashboard renders the NWPS
+# trace for the primary gauge alone. Add upstream sites here only alongside
+# UI that actually shows them -- otherwise it is a wasted request per refresh.
+NWPS_FORECAST_SITES = (
+    SITE_FRENCH_BROAD_ASHEVILLE,  # French Broad @ Asheville (primary)
+)
+
+# The dashboard's own cache is 60 s. Without a longer-lived cache here, a
+# locally-run Flask instance would burn the whole NWPS budget in a minute.
+# Forecast traces are reissued a few times a day, so 30 minutes costs nothing.
+_NWPS_TTL_SECONDS = 1800.0
+_NWPS_CACHE: dict[str, tuple[float, dict | None]] = {}
+# Set when NWPS returns 429; suppresses all calls until it passes.
+_NWPS_BACKOFF_UNTIL = 0.0
+_NWPS_BACKOFF_SECONDS = 300.0
 
 
 def fetch_nwps_forecast(usgs_site_id: str, timeout: int = 15) -> dict | None:
-    """Return the official NWS NWPS stage-flow forecast for a USGS site, or
-    None if no NWS ID mapping is known or the call fails.
+    """Return the official NWS NWPS stage-flow forecast for a USGS site.
+
+    Returns None if the site has no NWPS forecast point, the call fails, or we
+    are backing off from a rate-limit response.
 
     Output: ``{"lid": str, "issued": iso, "points": [{"t": iso, "ft": float},
     ...], "peak_ft": float, "peak_t": iso}``.
     """
-    lid = NWS_LID_FOR_USGS.get(usgs_site_id)
-    if not lid:
-        return None
+    global _NWPS_BACKOFF_UNTIL
+
+    now = time.time()
+    cached = _NWPS_CACHE.get(usgs_site_id)
+    if cached is not None and now - cached[0] < _NWPS_TTL_SECONDS:
+        return cached[1]
+
+    if now < _NWPS_BACKOFF_UNTIL:
+        log.info("NWPS forecast skipped (%s): backing off from rate limit",
+                 usgs_site_id)
+        return cached[1] if cached else None
+
     try:
         r = requests.get(
-            NWPS_FORECAST_URL.format(lid=lid),
+            NWPS_FORECAST_URL.format(ident=usgs_site_id),
             timeout=timeout,
             headers={"User-Agent": "hurricane-asheville/0.1"},
         )
+        if r.status_code == 429:
+            _NWPS_BACKOFF_UNTIL = now + _NWPS_BACKOFF_SECONDS
+            log.warning("NWPS rate limit hit; pausing forecast fetches for %.0f s",
+                        _NWPS_BACKOFF_SECONDS)
+            return cached[1] if cached else None
+        if r.status_code == 404:
+            # No forecast point at this gauge -- cache the negative so we do
+            # not spend a request on it again next refresh.
+            _NWPS_CACHE[usgs_site_id] = (now, None)
+            return None
         r.raise_for_status()
         data = r.json()
     except Exception as exc:  # noqa: BLE001
-        log.info("NWPS forecast fetch skipped (%s): %s", lid, exc)
-        return None
+        log.info("NWPS forecast fetch skipped (%s): %s", usgs_site_id, exc)
+        return cached[1] if cached else None
 
     pts: list[dict] = []
     for p in (data.get("data") or data.get("forecast") or []):
@@ -337,10 +509,12 @@ def fetch_nwps_forecast(usgs_site_id: str, timeout: int = 15) -> dict | None:
             continue
 
     peak = max(pts, key=lambda x: x["ft"]) if pts else None
-    return {
-        "lid": lid,
+    out = {
+        "lid": (thresholds_for(usgs_site_id) or {}).get("lid"),
         "issued": data.get("issuedTime") or data.get("issued"),
         "points": pts[:120],
         "peak_ft": peak["ft"] if peak else None,
         "peak_t": peak["t"] if peak else None,
     }
+    _NWPS_CACHE[usgs_site_id] = (now, out)
+    return out

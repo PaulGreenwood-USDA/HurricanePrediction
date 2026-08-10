@@ -138,6 +138,7 @@ PAGE = r"""
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Asheville Hurricane Risk - Live</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 <style>
@@ -202,10 +203,17 @@ PAGE = r"""
   .gauge-name b { display:block; font-size:.95rem; }
   .stage-pill { padding:.15rem .5rem; border-radius:4px; font-size:.78rem;
                 background: var(--panel2); white-space: nowrap; }
+  /* Severity classes come from gauge.flood_class -- single tokens, so
+     "below action" can never accidentally match the "action" rule. */
+  .stage-pill.below-action { background:#1b3a24; color:#a5d6a7; }
   .stage-pill.action { background:#9e9d24; color:#000; }
   .stage-pill.minor  { background:#ef6c00; }
   .stage-pill.moderate { background:#c62828; }
   .stage-pill.major  { background:#6a1b9a; }
+  .stage-pill.pool { background:#1a3550; color:#90caf9; }
+  .stage-pill.no-thresholds,
+  .stage-pill.unknown { background:#232732; color: var(--dim);
+                        border:1px dashed #3a3f4b; }
 
   /* gauge network filter tabs */
   .net-tabs { display:flex; flex-wrap:wrap; gap:.35rem;
@@ -745,7 +753,10 @@ PAGE = r"""
                       stroke-width="1.5"/>
           {% endif %}
         </svg>
-        <span class="stage-pill {{ g.flood_category|lower|replace(' flood','')|replace(' stage','') }}">
+        <span class="stage-pill {{ g.flood_class }}"
+              {% if g.thresholds_label %}title="{{ g.thresholds_label }}"
+              {% elif g.flood_class == 'pool' %}title="Reservoir pool elevation -- no NWS river flood stage applies"
+              {% elif g.flood_class == 'no-thresholds' %}title="No NWS flood thresholds published for this gauge"{% endif %}>
           {{ g.flood_category }}
         </span>
       </div>
@@ -1335,7 +1346,7 @@ PAGE = r"""
                       <span class="rate-down">&darr;</span>
                     {% endif %}
                   </span>
-                  <span class="stage-pill {{ g.flood_category|lower|replace(' flood','')|replace(' stage','') }}">
+                  <span class="stage-pill {{ g.flood_class }}">
                     {{ g.flood_category }}
                   </span>
                 </div>
@@ -1543,13 +1554,18 @@ PAGE = r"""
     });
   });
 
+  // Keyed off the explicit flood_class slug. Substring matching on the
+  // display label used to paint "below action" gauges action-stage yellow.
+  const GAUGE_COLOR = {
+    'below-action': '#4caf50',
+    'action':       '#fdd835',
+    'minor':        '#ef6c00',
+    'moderate':     '#c62828',
+    'major':        '#6a1b9a',
+    'pool':         '#1976d2',
+  };
   STATE.gauges.forEach(g => {
-    const cat = (g.flood_category || '').toLowerCase();
-    let color = '#4caf50';
-    if (cat.includes('action')) color = '#fdd835';
-    if (cat.includes('minor')) color = '#ef6c00';
-    if (cat.includes('moderate')) color = '#c62828';
-    if (cat.includes('major')) color = '#6a1b9a';
+    const color = GAUGE_COLOR[g.flood_class] || '#607d8b';
     const m = L.circleMarker([g.lat, g.lon], {
       radius: g.site_id === STATE.primary_site ? 9 : 6,
       color, fillColor: color, fillOpacity: .7, weight: 2,

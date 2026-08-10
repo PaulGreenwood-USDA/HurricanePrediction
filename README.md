@@ -173,6 +173,15 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
   (≥ 0.40 m³/m³), 7-day antecedent precipitation, active flood / tropical
   alerts, and proximity of any active TC
   ([src/hurricane_asheville/index_score.py](src/hurricane_asheville/index_score.py)).
+- **Flood thresholds are per gauge.** Each USGS site sits on its own datum, so
+  every gauge is classified against its own NWS action / minor / moderate /
+  major stages from
+  [data/nws_flood_thresholds.json](data/nws_flood_thresholds.json). Gauges with
+  no published NWS thresholds render as *no thresholds* rather than being
+  measured against another river's numbers, and reservoir gauges render as
+  *pool stage* because a lake has no river flood stage. Refresh the table with
+  `uv run python scripts/refresh_flood_thresholds.py` (slow by design — NWPS
+  allows 10 requests per 5 minutes).
 - HURDAT2 is cached in [data/hurdat2.txt](data/hurdat2.txt) and the elevation
   grid in [data/dem.npz](data/dem.npz) after first download.
 
@@ -187,6 +196,7 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
 | Open-Meteo Forecast API                 | none      | Current weather + soil moisture           |
 | Open-Meteo Elevation API                | none      | DEM grid for orographic calc              |
 | NOAA CO-OPS datagetter                  | none      | Live NC tide / surge observations         |
+| NWS NWPS (api.water.noaa.gov)           | none      | Per-gauge flood thresholds (baked)        |
 | CSU Tropical Meteorology Project (PDF)  | bundled   | 2026 seasonal forecast constants          |
 
 All HTTP calls have timeouts and degrade gracefully when a service is offline;
@@ -200,8 +210,11 @@ build_static.py               render dashboard once for GitHub Pages
 extract_pdf.py                pull text out of the bundled CSU PDF
 wsgi.py                       gunicorn entry point for Azure App Service
 infra/                        Bicep for App Service + supporting resources
+scripts/
+  refresh_flood_thresholds.py regenerate data/nws_flood_thresholds.json
 site/                         static snapshot output (index.html, state.json)
 data/                         hurdat2.txt + dem.npz cache
+  nws_flood_thresholds.json   per-gauge NWS flood stages (from NWPS)
 output/                       generated plots (e.g. tracks.png)
 src/hurricane_asheville/
   config.py        constants, Asheville lat/lon, CSU 2026 numbers, URLs
