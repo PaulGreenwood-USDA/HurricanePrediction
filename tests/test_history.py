@@ -177,3 +177,57 @@ def test_history_stats_counts_partitions(tmp_path: Path):
     assert stats["rows"] > 0
     assert stats["sources"] == ["snapshot"]
     assert "gauge" in stats["entity_count"]
+
+
+# ---- drop_entities --------------------------------------------------------
+
+def _rows(pairs):
+    """pairs: [(ts, entity_id, metric, value)]"""
+    return [{"ts": t, "source": "usgs_dv", "entity_type": "gauge",
+             "entity_id": e, "metric": m, "value": v} for t, e, m, v in pairs]
+
+
+def test_drop_entities_removes_only_the_targets(tmp_path):
+    from hurricane_asheville import history
+
+    history.append_long_rows(_rows([
+        ("2024-09-27", "keep_me", "stage_ft", 1.0),
+        ("2024-09-27", "drop_me", "stage_ft", 2.0),
+        ("2024-09-28", "drop_me", "stage_ft", 3.0),
+    ]), base_dir=tmp_path)
+
+    out = history.drop_entities(["drop_me"], base_dir=tmp_path)
+    assert out["removed"] == 2
+    remaining = history.load_history(base_dir=tmp_path)
+    assert set(remaining["entity_id"]) == {"keep_me"}
+
+
+def test_drop_entities_dry_run_changes_nothing(tmp_path):
+    from hurricane_asheville import history
+
+    history.append_long_rows(_rows([
+        ("2024-09-27", "drop_me", "stage_ft", 2.0),
+    ]), base_dir=tmp_path)
+
+    out = history.drop_entities(["drop_me"], base_dir=tmp_path, dry_run=True)
+    assert out["removed"] == 1
+    assert len(history.load_history(base_dir=tmp_path)) == 1
+
+
+def test_drop_entities_respects_entity_type(tmp_path):
+    from hurricane_asheville import history
+
+    rows = _rows([("2024-09-27", "shared_id", "stage_ft", 1.0)])
+    rows += [{"ts": "2024-09-27", "source": "snapshot",
+              "entity_type": "buoy", "entity_id": "shared_id",
+              "metric": "wind_kt", "value": 9.0}]
+    history.append_long_rows(rows, base_dir=tmp_path)
+
+    history.drop_entities(["shared_id"], entity_type="gauge", base_dir=tmp_path)
+    remaining = history.load_history(base_dir=tmp_path)
+    assert list(remaining["entity_type"]) == ["buoy"]
+
+
+def test_drop_entities_no_targets_is_a_noop(tmp_path):
+    from hurricane_asheville import history
+    assert history.drop_entities([], base_dir=tmp_path)["removed"] == 0

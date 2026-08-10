@@ -63,7 +63,11 @@ def _parse_usgs_dv_payload(data: dict, site_id: str
     for ts in series:
         code = ts["variable"]["variableCode"][0]["value"]
         metric = {"00065": "stage_ft",
-                   "00060": "discharge_cfs"}.get(code)
+                   "00060": "discharge_cfs",
+                   # Reservoirs report pool elevation, not river stage. Asking
+                   # only for 00060/00065 returned nothing at all for Falls
+                   # Lake and almost nothing for Jordan Lake.
+                   "00062": "pool_elevation_ft"}.get(code)
         if not metric:
             continue
         values = (ts.get("values") or [{}])[0].get("value") or []
@@ -89,7 +93,7 @@ def fetch_usgs_dv(site_id: str, start: str, end: str,
             USGS_DV_URL,
             params={
                 "sites": site_id,
-                "parameterCd": "00060,00065",
+                "parameterCd": "00060,00062,00065",
                 "startDT": start,
                 "endDT": end,
                 "format": "json",
@@ -203,6 +207,108 @@ def _archive_to_rows(data: dict, entity_type: str, entity_id: str) -> list[dict]
     return out
 
 
+# ---- Open-Meteo ERA5 soil moisture ---------------------------------------
+
+# Soil moisture is the pre-conditioner that turns a wet tropical system into a
+# catastrophic one, and it was the single input with no history at all -- the
+# daily archive above carries only precip, temp and wind. ERA5 publishes it
+# hourly, so we pull hourly and reduce to a daily mean.
+#
+# Depths differ from the live feed. soil.py reads the forecast model's
+# 0-1/1-3/3-9/9-27 cm layers; ERA5 offers 0-7/7-28 cm. They are the same
+# quantity in the same units but not the same measurement, so they get
+# distinct metric names rather than being silently concatenated into one
+# series that changes definition partway through.
+_SOIL_HOURLY_VARS = ("soil_moisture_0_to_7cm", "soil_moisture_7_to_28cm")
+
+_SOIL_VAR_TO_METRIC = {
+    "soil_moisture_0_to_7cm":  "soil_era5_0_7cm",
+    "soil_moisture_7_to_28cm": "soil_era5_7_28cm",
+}
+
+
+def fetch_open_meteo_soil(lat: float, lon: float, start: str, end: str,
+                           timeout: int = 120) -> dict:
+    """Raw hourly ERA5 soil-moisture payload for one point."""
+    try:
+        r = requests.get(
+            OPEN_METEO_ARCHIVE_URL,
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "start_date": start,
+                "end_date": end,
+                "hourly": ",".join(_SOIL_HOURLY_VARS),
+                "timezone": "UTC",
+            },
+            timeout=timeout,
+            headers={"User-Agent": "hurricane-asheville/0.1"},
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Open-Meteo soil fetch failed (%.3f, %.3f): %s",
+                    lat, lon, exc)
+        return {}
+
+
+def _soil_to_daily_rows(data: dict, entity_type: str,
+                         entity_id: str) -> list[dict]:
+    """Reduce hourly soil moisture to one daily mean per metric.
+
+    Five years hourly at 13 points is ~1.1M values; the index replay and the
+    ML feature builder both work daily, so storing hourly would be dead weight.
+    """
+    hourly = data.get("hourly") or {}
+    times = hourly.get("time") or []
+    if not times:
+        return []
+
+    out: list[dict] = []
+    for api_var, metric in _SOIL_VAR_TO_METRIC.items():
+        values = hourly.get(api_var) or []
+        buckets: dict[str, list[float]] = {}
+        for t, v in zip(times, values):
+            if v is None:
+                continue
+            try:
+                buckets.setdefault(t[:10], []).append(float(v))
+            except (TypeError, ValueError):
+                continue
+        for day, vals in buckets.items():
+            out.append({
+                "ts": day,
+                "source": "open_meteo_archive",
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "metric": metric,
+                "value": sum(vals) / len(vals),
+            })
+    return out
+
+
+def bootstrap_soil(years: int = 5,
+                    points: Iterable[tuple[str, str, float, float]] | None = None,
+                    end: str | None = None,
+                    pause_s: float = 0.6) -> list[dict]:
+    """Daily-mean ERA5 soil moisture for every weather point, last N years."""
+    end_d = _dt.date.today() if end is None else _dt.date.fromisoformat(end)
+    start_d = end_d.replace(year=end_d.year - years)
+    pts = list(points) if points else _all_weather_points()
+    log.info("bootstrap_soil: %d points, %s -> %s", len(pts), start_d, end_d)
+
+    rows: list[dict] = []
+    for etype, eid, lat, lon in pts:
+        data = fetch_open_meteo_soil(lat, lon, start_d.isoformat(),
+                                      end_d.isoformat())
+        chunk = _soil_to_daily_rows(data, etype, eid)
+        log.info("  %s/%s: %d rows", etype, eid, len(chunk))
+        rows.extend(chunk)
+        if pause_s:
+            time.sleep(pause_s)
+    return rows
+
+
 def bootstrap_weather(years: int = 5,
                        points: Iterable[tuple[str, str, float, float]]
                           | None = None,
@@ -239,14 +345,17 @@ def bootstrap_all(years: int = 5, base_dir=None) -> dict:
 
     gauge_rows = bootstrap_gauges(years=years)
     weather_rows = bootstrap_weather(years=years)
+    soil_rows = bootstrap_soil(years=years)
 
     kw = {} if base_dir is None else {"base_dir": base_dir}
     g_files = history.append_long_rows(gauge_rows, **kw)
     w_files = history.append_long_rows(weather_rows, **kw)
+    s_files = history.append_long_rows(soil_rows, **kw)
 
     return {
         "years": years,
         "gauge_rows": len(gauge_rows),
         "weather_rows": len(weather_rows),
-        "partitions_written": len({*g_files, *w_files}),
+        "soil_rows": len(soil_rows),
+        "partitions_written": len({*g_files, *w_files, *s_files}),
     }

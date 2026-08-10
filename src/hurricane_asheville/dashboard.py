@@ -125,6 +125,15 @@ def _collect():
     except Exception as exc:  # noqa: BLE001
         _log.warning("ml forecasts skipped: %s", exc)
 
+    # Historical validation of the index itself, baked by `index-replay`.
+    try:
+        from .index_replay import load_validation
+        validation = load_validation()
+        if validation:
+            data["index_validation"] = validation
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("index validation skipped: %s", exc)
+
     # Narrative TL;DR + glossary (always cheap, always populated).
     try:
         from .narrative import GLOSSARY, summarize

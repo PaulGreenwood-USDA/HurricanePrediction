@@ -95,6 +95,9 @@ uv run hurricane-asheville dem
 # Live USGS gauge + NWS alerts for Asheville
 uv run hurricane-asheville gauge
 
+# Replay the Flood Index over history and validate it against Helene
+uv run hurricane-asheville index-replay
+
 # Run the live web dashboard (Flask) at http://127.0.0.1:5000
 uv run hurricane-asheville dashboard
 uv run hurricane-asheville dashboard --host 0.0.0.0 --port 8000 --debug
@@ -215,6 +218,22 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
 - **Helene's chart peak is a floor, not the crest.** The USGS gauge recorded
   18.47 ft before it stopped reporting; NWS carries the crest at 24.82 ft. The
   history card says so rather than presenting the recorded value as the peak.
+- **The Flood Index has been validated against Helene.** `index-replay`
+  reconstructs historical inputs and runs the *same* scorer the live page uses
+  over 1,902 days (2021-05-27 to present). Result: Helene peaks at **96/100
+  (EMERGENCY)** on 2024-09-27 with **3 days of ALERT-or-above lead time**, and
+  only **12 of 1,902 days (0.63%)** ever reach ALERT — every one of them with a
+  named tropical system in range (Fred, Henri, Ida, Ian, Nicole, Helene). No
+  false positives in five years.
+
+  The replay is deliberately conservative in three of four respects: stage is a
+  daily mean rather than the crest, rate-of-rise is averaged over 24 h so a
+  flash rise barely registers, and NWS alert state is not archived so that
+  component is always zero. The fourth cuts the other way — rainfall uses what
+  actually fell, so it assumes a perfect 72-hour forecast and real lead time
+  would be shorter. Regenerate with
+  `uv run hurricane-asheville index-replay`, which writes
+  [data/index_validation.json](data/index_validation.json) for the dashboard.
 - HURDAT2 is cached in [data/hurdat2.txt](data/hurdat2.txt) and the elevation
   grid in [data/dem.npz](data/dem.npz) after first download.
 
@@ -231,6 +250,7 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
 | Open-Meteo Elevation API                | none      | DEM grid for orographic calc              |
 | NOAA CO-OPS datagetter                  | none      | Live NC tide / surge observations         |
 | NWS NWPS (api.water.noaa.gov)           | none      | Per-gauge flood thresholds (baked)        |
+| Open-Meteo ERA5 archive                 | none      | 5-year precip / soil-moisture backfill    |
 | CSU Tropical Meteorology Project (PDF)  | bundled   | 2026 seasonal forecast constants          |
 
 All HTTP calls have timeouts and degrade gracefully when a service is offline;
@@ -249,6 +269,7 @@ scripts/
 site/                         static snapshot output (index.html, state.json)
 data/                         hurdat2.txt + dem.npz cache
   nws_flood_thresholds.json   per-gauge NWS flood stages (from NWPS)
+  index_validation.json       Flood Index replay summary (from index-replay)
 output/                       generated plots (e.g. tracks.png)
 src/hurricane_asheville/
   config.py        constants, Asheville lat/lon, CSU 2026 numbers, URLs
@@ -270,6 +291,7 @@ src/hurricane_asheville/
   viewmodel.py     pure state -> render primitives (sparklines, bands, ML card)
   stage_history.py long-run stage series + month-of-year percentile
   storm_track.py   NHC forecast track / cone KMZ parsing
+  index_replay.py  historical Flood Index replay + Helene validation
   templates/       dashboard.html + card partials
   static/          dashboard.css, dashboard.js
   cli.py           argparse entry point

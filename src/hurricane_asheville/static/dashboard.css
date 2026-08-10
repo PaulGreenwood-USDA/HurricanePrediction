@@ -561,3 +561,20 @@ footer { text-align:center; padding: 1rem; color: var(--dim); font-size:.8rem; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ── Index validation ("has this ever worked?") ────────────────────── */
+.validation-grid { display: grid; gap: 1rem; margin-top: .5rem;
+                   grid-template-columns: auto 1fr; align-items: center; }
+@media (max-width: 620px) { .validation-grid { grid-template-columns: 1fr; } }
+.validation-headline { background: var(--panel2); border-radius: 8px;
+                       padding: .9rem 1.3rem; text-align: center;
+                       border-top: 3px solid #6a1b9a; }
+.v-score { font-size: 3rem; font-weight: 800; line-height: 1;
+           font-variant-numeric: tabular-nums; }
+.v-label { font-size: .72rem; font-weight: 800; letter-spacing: .16em;
+           text-transform: uppercase; color: #ce93d8; margin: .2rem 0 .3rem; }
+.validation-facts { display: grid; gap: .45rem; }
+.v-fact { background: var(--panel2); border-radius: 6px; padding: .5rem .75rem;
+          font-size: .85rem; }
+.v-fact b { color: var(--accent); font-size: 1.05rem;
+            font-variant-numeric: tabular-nums; margin-right: .3rem; }

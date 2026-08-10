@@ -157,6 +157,73 @@
   </div>
   {% endif %}
 
+  {# ── Index validation ───────────────────────────────────────────── #}
+  {% set v = data.get('index_validation') %}
+  {% if v and v.event and v.event.score %}
+  <div class="card span12 validation">
+    <h2>Has this index ever worked?
+      <span class="ml-subtitle">
+        <span>replayed over {{ "{:,}".format(v.generated_from.days) }} days</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span>{{ v.generated_from.first_date }} to {{ v.generated_from.last_date }}</span>
+      </span>
+    </h2>
+    <div class="validation-grid">
+      <div class="validation-headline">
+        <div class="v-score" style="color:#6a1b9a;">{{ v.event.score }}</div>
+        <div class="v-label">{{ v.event.label }}</div>
+        <div class="dim">during {{ v.event.name }}, {{ v.event.date }}</div>
+      </div>
+      <div class="validation-facts">
+        <div class="v-fact">
+          <b>{{ v.event.lead_days }} day{{ '' if v.event.lead_days == 1 else 's' }}</b>
+          of ALERT or above before the crest
+        </div>
+        <div class="v-fact">
+          <b>{{ v.base_rate.pct }}%</b>
+          of days reach ALERT ({{ v.base_rate.alert_or_above_days }} of
+          {{ "{:,}".format(v.base_rate.total_days) }})
+        </div>
+        <div class="v-fact">
+          <b>{{ v.base_rate.with_named_storm }} of {{ v.base_rate.alert_or_above_days }}</b>
+          ALERT days had a named tropical system in range
+        </div>
+      </div>
+    </div>
+
+    {% if v.elevated_days %}
+    <div class="ll-section-title" style="margin-top:.8rem;">Every day the index reached ALERT or above</div>
+    <div class="scroll-x">
+      <table>
+        <tr><th>Date</th><th>Score</th><th>Level</th><th>Stage (ft)</th><th>Storm</th></tr>
+        {% for d in v.elevated_days %}
+        <tr>
+          <td>{{ d.date }}</td>
+          <td><b>{{ d.score }}</b></td>
+          <td>{{ d.label }}</td>
+          <td>{{ "%.2f"|format(d.stage_ft) if d.stage_ft is not none else "-" }}</td>
+          <td>{{ d.storm or "&mdash;"|safe }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+
+    {% if v.caveats %}
+    <div class="ml-caveat">
+      <b>What this replay can and cannot show.</b> It runs the same scorer the
+      live page uses, against historical inputs. Three of those inputs make the
+      replayed score too <em>low</em> — stage is a daily mean rather than the
+      crest, rate-of-rise is averaged over 24 hours so a flash rise barely
+      registers, and NWS alert state is not archived so that component is
+      always zero. One makes it too <em>high</em>: rainfall uses what actually
+      fell, so the replay assumes a perfect 72-hour forecast and real lead time
+      would be shorter.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# ── Gauge networks ─────────────────────────────────────────────── #}
   <div class="card span12">
     <h2>Gauge networks</h2>
