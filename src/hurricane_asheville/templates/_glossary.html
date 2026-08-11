@@ -1,0 +1,23 @@
+{% if data.glossary %}
+  <div class="card span12 legend">
+    <h2>How to read this dashboard</h2>
+    <div class="dim" style="margin-bottom:.5rem; font-size:.78rem;">
+      Plain-English definitions for the jargon on this page. Tap or focus any
+      underlined term to read its definition inline &mdash; hover tooltips are
+      invisible on a phone, which is where this is needed most.
+    </div>
+    <dl style="column-count: 2; column-gap: 1.5rem;">
+      {% for term in [
+          'Flood Index','QPF','stage','action stage','minor flood',
+          'moderate flood','major flood','discharge','rate',
+          'NWPS forecast','ML forecast','backtest','MAE','AUC',
+          'soil saturated','TC','ETA',
+        ] %}
+        {% if data.glossary.get(term) %}
+        <dt id="glossary-{{ term|replace(' ','-') }}">{{ term }}</dt>
+        <dd>{{ data.glossary[term] }}</dd>
+        {% endif %}
+      {% endfor %}
+    </dl>
+  </div>
+{% endif %}

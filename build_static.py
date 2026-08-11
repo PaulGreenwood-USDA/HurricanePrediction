@@ -17,10 +17,29 @@ if str(_SRC) not in sys.path:
 from hurricane_asheville.dashboard import app  # noqa: E402
 
 
+def _copy_assets(out: Path) -> None:
+    """Copy templates' static assets next to index.html.
+
+    Flask serves these from /static at runtime, but Pages hosts the site under
+    a project subpath where a root-absolute /static/... would 404, so the HTML
+    is rewritten to reference them relatively.
+    """
+    import shutil
+    src = Path(app.static_folder)
+    dest = out / "static"
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(src, dest)
+    print(f"copied {len(list(dest.iterdir()))} static assets -> {dest}")
+
+
 def main() -> None:
     out = _ROOT / "site"
     out.mkdir(parents=True, exist_ok=True)
 
+    # Tells the dashboard to point its refresh poller at state.json rather
+    # than the Flask-only /api/state route.
+    app.config["STATIC_BUILD"] = True
     client = app.test_client()
 
     # Render the dashboard. If a transient upstream API failure causes Flask
@@ -28,8 +47,10 @@ def main() -> None:
     # failing the Pages build (which would leave the site stale anyway).
     html = client.get("/")
     if html.status_code == 200 and html.data:
-        (out / "index.html").write_bytes(html.data)
-        print(f"wrote {out / 'index.html'} ({len(html.data)} bytes)")
+        page = html.data.replace(b'"/static/', b'"static/')
+        (out / "index.html").write_bytes(page)
+        _copy_assets(out)
+        print(f"wrote {out / 'index.html'} ({len(page)} bytes)")
     else:
         existing = out / "index.html"
         print(

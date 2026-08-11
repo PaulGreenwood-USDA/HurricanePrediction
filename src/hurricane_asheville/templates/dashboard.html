@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Asheville Hurricane Risk - Live</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+</head>
+<body>
+<header>
+  <h1>&#127786; Asheville Hurricane Risk</h1>
+  <span class="freshness {{ vm.freshness.level }}" id="freshness"
+        data-as-of="{{ vm.freshness.as_of_epoch or '' }}"
+        data-interval="{{ vm.freshness.interval_minutes }}">
+    <span class="dot" aria-hidden="true"></span>
+    <span><b id="fresh-label">{{ vm.freshness.label }}</b>
+      &middot; data <span class="age" id="age">
+        {%- if vm.freshness.age_minutes is not none -%}
+          {{ vm.freshness.age_minutes|round|int }} min old
+        {%- else -%}age unknown{%- endif -%}
+      </span>
+      &middot; <span class="cadence">{{ vm.freshness.cadence }}</span>
+    </span>
+  </span>
+</header>
+
+<div class="grid">
+
+  {% set n = data.get('narrative') %}
+  {% if n %}
+  <div class="card hero" style="--hero-color: {{ n.color }};">
+    <span class="level" style="background: {{ n.color }};">{{ n.level }}</span>
+    <h2 class="headline">{{ n.headline }}</h2>
+    <div class="sub">{{ n.subheadline }}</div>
+    <div class="rec">{{ n.recommendation }}</div>
+    {% if n.key_facts %}
+    <div class="facts">
+      {% for f in n.key_facts %}<div class="fact">{{ f }}</div>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Flood index ────────────────────────────────────────────────── #}
+  <div class="card span5">
+    <h2>{{ jargon('Flood Index', 'Asheville Flood Index') }}</h2>
+    <div class="dial-wrap">
+      <svg class="dial" viewBox="0 0 120 120" role="img"
+           aria-label="Flood index {{ data.index.score }} of 100, {{ data.index.label }}">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="#2a2e36" stroke-width="12"/>
+        <circle cx="60" cy="60" r="52" fill="none"
+                stroke="{{ data.index.color }}" stroke-width="12"
+                stroke-linecap="round"
+                stroke-dasharray="{{ vm.dial.dash }}"
+                transform="rotate(-90 60 60)"/>
+        <text x="60" y="62" text-anchor="middle"
+              fill="#e6e6e6" font-size="28" font-weight="800">{{ data.index.score }}</text>
+        <text x="60" y="80" text-anchor="middle" fill="#9aa0aa" font-size="9"
+              letter-spacing="2">/ 100</text>
+      </svg>
+      <div class="breakdown">
+        <span class="dial-label" style="background: {{ data.index.color }}">{{ data.index.label }}</span>
+        <div class="seg">
+          {% for s in vm.dial.segments %}
+            <span style="width: {{ s.width }}%; background: {{ s.color }}"
+                  title="{{ s.key }} {{ s.width }}"></span>
+          {% endfor %}
+        </div>
+        <div class="dim" style="margin-top:.5rem; font-size:.78rem;">
+          {% for s in vm.dial.segments %}{{ s.key }} {{ s.width }}{% if not loop.last %} &middot; {% endif %}{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Triggers ───────────────────────────────────────────────────── #}
+  <div class="card span7">
+    <h2>Triggers</h2>
+    <div class="dim" style="margin-bottom:.4rem; font-size:.78rem;">
+      Discrete risk conditions. Filled markers are currently firing.
+    </div>
+    <div class="trig-strip">
+      {% for t in vm.triggers %}
+        <span class="trig {{ 'on' if t.on }}">
+          <span class="visually-hidden">{{ 'firing:' if t.on else 'not firing:' }}</span>{{ t.label }}
+        </span>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── Long-run stage history ─────────────────────────────────────── #}
+  {% if vm.history and vm.history_chart %}
+  {% set h = vm.history %}{% set hc = vm.history_chart %}
+  <div class="card span12">
+    <h2>French Broad at Asheville &mdash; {{ h.first_ts[:4] }} to now
+      <span class="ml-subtitle">
+        <span>daily maximum stage</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span>{{ "{:,}".format(h.n_observations) }} observations</span>
+      </span>
+    </h2>
+    <div class="history-wrap">
+      <svg class="history-chart" viewBox="0 -6 {{ hc.width }} {{ hc.height + 12 }}"
+           preserveAspectRatio="none" role="img"
+           aria-label="Stage history since {{ h.first_ts }}; peak {{ h.helene_ft }} feet during Helene; current {{ h.current_ft }} feet">
+        {% if hc.y_record is not none %}
+          <line class="history-ref record" x1="0" y1="{{ hc.y_record }}"
+                x2="{{ hc.width }}" y2="{{ hc.y_record }}"/>
+        {% endif %}
+        {% if hc.y_helene is not none %}
+          <line class="history-ref helene" x1="0" y1="{{ hc.y_helene }}"
+                x2="{{ hc.width }}" y2="{{ hc.y_helene }}"/>
+        {% endif %}
+        {% if hc.y_current is not none %}
+          <line class="history-ref current" x1="0" y1="{{ hc.y_current }}"
+                x2="{{ hc.width }}" y2="{{ hc.y_current }}"/>
+        {% endif %}
+        <polyline class="history-line" points="{{ hc.points }}"/>
+        {% if hc.helene_x is not none %}
+          <circle cx="{{ hc.helene_x }}" cy="{{ hc.y_helene }}" r="3"
+                  fill="#c62828" stroke="#fff" stroke-width="1"
+                  vector-effect="non-scaling-stroke"/>
+        {% endif %}
+      </svg>
+      <div class="history-years">
+        {% for t in hc.year_ticks %}
+          <span style="left: {{ (t.x / hc.width * 100)|round(2) }}%">{{ t.label }}</span>
+        {% endfor %}
+      </div>
+      <div class="history-legend">
+        <span style="color:#4fc3f7"><span class="swatch" style="border-top-style:solid"></span>Daily max stage</span>
+        {% if h.helene_ft %}<span style="color:#c62828"><span class="swatch"></span>Helene {{ "%.1f"|format(h.helene_ft) }} ft ({{ h.helene_date }})</span>{% endif %}
+        {% if h.record_ft %}<span style="color:#6a1b9a"><span class="swatch"></span>{{ h.record_label }} {{ "%.1f"|format(h.record_ft) }} ft</span>{% endif %}
+        {% if h.current_ft is not none %}<span style="color:#ffffff"><span class="swatch"></span>Now {{ "%.2f"|format(h.current_ft) }} ft</span>{% endif %}
+      </div>
+    </div>
+
+    {% if h.percentile is not none %}
+    <div class="percentile-callout">
+      <b>{{ h.percentile|round|int }}<sup>th</sup></b>
+      <span>percentile for {{ h.percentile_month }} &mdash;
+        today's {{ "%.2f"|format(h.current_ft) }} ft is higher than
+        {{ h.percentile|round|int }}% of {{ h.percentile_month }} readings
+        since {{ h.first_ts[:4] }}.</span>
+    </div>
+    {% endif %}
+
+    {% if h.gauge_truncated %}
+    <div class="gauge-truncated">
+      Helene's recorded peak of {{ "%.1f"|format(h.helene_ft) }} ft is the
+      highest value the gauge reported, not the highest the river reached
+      &mdash; NWS carries the crest at {{ "%.1f"|format(h.record_ft) }} ft.
+      Treat the 2024 peak on this chart as a floor.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Index validation ───────────────────────────────────────────── #}
+  {% set v = data.get('index_validation') %}
+  {% if v and v.event and v.event.score %}
+  <div class="card span12 validation">
+    <h2>Has this index ever worked?
+      <span class="ml-subtitle">
+        <span>replayed over {{ "{:,}".format(v.generated_from.days) }} days</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span>{{ v.generated_from.first_date }} to {{ v.generated_from.last_date }}</span>
+      </span>
+    </h2>
+    <div class="validation-grid">
+      <div class="validation-headline">
+        <div class="v-score" style="color:#6a1b9a;">{{ v.event.score }}</div>
+        <div class="v-label">{{ v.event.label }}</div>
+        <div class="dim">during {{ v.event.name }}, {{ v.event.date }}</div>
+      </div>
+      <div class="validation-facts">
+        <div class="v-fact">
+          <b>{{ v.event.lead_days }} day{{ '' if v.event.lead_days == 1 else 's' }}</b>
+          of ALERT or above before the crest
+        </div>
+        <div class="v-fact">
+          <b>{{ v.base_rate.pct }}%</b>
+          of days reach ALERT ({{ v.base_rate.alert_or_above_days }} of
+          {{ "{:,}".format(v.base_rate.total_days) }})
+        </div>
+        <div class="v-fact">
+          <b>{{ v.base_rate.with_named_storm }} of {{ v.base_rate.alert_or_above_days }}</b>
+          ALERT days had a named tropical system in range
+        </div>
+      </div>
+    </div>
+
+    {% if v.elevated_days %}
+    <div class="ll-section-title" style="margin-top:.8rem;">Every day the index reached ALERT or above</div>
+    <div class="scroll-x">
+      <table>
+        <tr><th>Date</th><th>Score</th><th>Level</th><th>Stage (ft)</th><th>Storm</th></tr>
+        {% for d in v.elevated_days %}
+        <tr>
+          <td>{{ d.date }}</td>
+          <td><b>{{ d.score }}</b></td>
+          <td>{{ d.label }}</td>
+          <td>{{ "%.2f"|format(d.stage_ft) if d.stage_ft is not none else "-" }}</td>
+          <td>{{ d.storm or "&mdash;"|safe }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+
+    {% if v.caveats %}
+    <div class="ml-caveat">
+      <b>What this replay can and cannot show.</b> It runs the same scorer the
+      live page uses, against historical inputs. Three of those inputs make the
+      replayed score too <em>low</em> — stage is a daily mean rather than the
+      crest, rate-of-rise is averaged over 24 hours so a flash rise barely
+      registers, and NWS alert state is not archived so that component is
+      always zero. One makes it too <em>high</em>: rainfall uses what actually
+      fell, so the replay assumes a perfect 72-hour forecast and real lead time
+      would be shorter.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Gauge networks ─────────────────────────────────────────────── #}
+  <div class="card span12">
+    <h2>Gauge networks</h2>
+    <div class="net-tabs" id="net-tabs" role="tablist">
+      {% for tab in vm.networks.tabs %}
+        <span class="net-tab {{ 'active' if loop.first }}" data-net="{{ tab.key }}"
+              role="tab" tabindex="0" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ tab.label }}<span class="count">{{ tab.count }}</span></span>
+      {% endfor %}
+    </div>
+    {% for g in data.gauges %}
+      {% set spark = vm.sparklines.get(g.site_id) %}
+      <div class="gauge-row" data-net="{{ vm.networks.role_to_net.get(g.role, 'other') }}">
+        <div class="gauge-name">
+          <b>{{ g.label }}</b>
+          <span class="dim">{{ g.role }} &middot; USGS {{ g.site_id }}</span>
+        </div>
+        <div style="text-align:right;">
+          <div><b>{{ "%.2f"|format(g.display_ft) if g.display_ft is not none else "?" }}</b>
+               <span class="dim" style="font-size:.78rem;">{{ g.display_units or "ft" }}</span></div>
+          {% if g.rate_ft_per_hr is not none %}
+            {% if g.rate_ft_per_hr > 0.05 %}
+              <span class="dim rate-up">&uarr; {{ "%.2f"|format(g.rate_ft_per_hr) }} ft/hr</span>
+            {% elif g.rate_ft_per_hr < -0.05 %}
+              <span class="dim rate-down">&darr; {{ "%.2f"|format(-g.rate_ft_per_hr) }} ft/hr</span>
+            {% else %}
+              <span class="dim">flat</span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+          {% if spark %}
+            <polyline points="{{ spark.points }}" fill="none"
+                      stroke="{{ '#ef5350' if spark.rising else '#4fc3f7' }}"
+                      stroke-width="1.5"/>
+          {% endif %}
+        </svg>
+        <span class="stage-pill {{ g.flood_class }}"
+              {% if g.thresholds_label %}title="{{ g.thresholds_label }}"
+              {% elif g.flood_class == 'pool' %}title="Reservoir pool elevation -- no NWS river flood stage applies"
+              {% elif g.flood_class == 'no-thresholds' %}title="No NWS flood thresholds published for this gauge"{% endif %}>
+          <span class="sev-mark" aria-hidden="true">{{ severity_mark(g.flood_class) }}</span>{{ g.flood_category }}
+        </span>
+      </div>
+    {% endfor %}
+
+    {% set p = vm.primary_gauge %}
+    {% if p and (p.eta_minor_hr is not none or p.eta_moderate_hr is not none or p.eta_major_hr is not none) %}
+      <div class="dim" style="margin-top:.6rem;">
+        <b>Linear ETA at current rate</b>:
+        {% if p.eta_minor_hr is not none %} minor {{ "%.1f"|format(p.eta_minor_hr) }}h{% endif %}
+        {% if p.eta_moderate_hr is not none %} &middot; moderate {{ "%.1f"|format(p.eta_moderate_hr) }}h{% endif %}
+        {% if p.eta_major_hr is not none %} &middot; major {{ "%.1f"|format(p.eta_major_hr) }}h{% endif %}
+      </div>
+    {% endif %}
+    {% if p and p.nwps_forecast and p.nwps_forecast.peak_ft is not none %}
+      <div class="dim" style="margin-top:.3rem;">
+        <b>NWS NWPS forecast</b>:
+        peak {{ "%.2f"|format(p.nwps_forecast.peak_ft) }} ft
+        {% if p.nwps_forecast.peak_t %} at {{ p.nwps_forecast.peak_t }}{% endif %}
+        ({{ p.nwps_forecast.points|length }} pts, issued {{ p.nwps_forecast.issued or 'n/a' }})
+      </div>
+    {% endif %}
+  </div>
+
+  {# ── ML forecast ────────────────────────────────────────────────── #}
+  {% set ml = vm.ml %}
+  {% if ml %}
+  <div class="card span12">
+    <h2>
+      {{ jargon('ML forecast', 'ML stage forecast') }}
+      <span class="ml-subtitle">
+        <span>LightGBM</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span>trained on {{ h.n_observations if vm.history else 'USGS' }} gauge observations</span>
+        <span class="dot" aria-hidden="true">&middot;</span>
+        <span class="site-chip">site {{ ml.site }}</span>
+      </span>
+    </h2>
+
+    <div class="ml-grid">
+      {% for hz in ml.horizons %}
+        <div class="ml-horizon">
+          <div class="h-label">+{{ hz.horizon_h }} hours</div>
+          <div class="h-stage">{{ "%.2f"|format(hz.predicted_ft) }}<small> ft</small></div>
+          {% if hz.delta is not none %}
+            <div class="h-delta {{ hz.direction }}">
+              {{ hz.arrow }} {{ "%+.2f"|format(hz.delta) }} ft vs now ({{ "%.2f"|format(hz.current_ft) }} ft)
+            </div>
+          {% endif %}
+          {% if ml.bands %}
+          <div class="ml-bar {{ 'high' if hz.above_minor }}">
+            {% for b in ml.bands %}
+              <div class="band {{ b.level }}" style="left:{{ b.left }}%; width:{{ b.width }}%;"></div>
+            {% endfor %}
+            {% if hz.now_pct is not none %}
+              <div class="now" style="left:{{ hz.now_pct }}%;" title="Current {{ '%.2f'|format(hz.current_ft) }} ft"></div>
+            {% endif %}
+            <div class="pred" style="left:{{ hz.pred_pct }}%;" title="Predicted {{ '%.2f'|format(hz.predicted_ft) }} ft"></div>
+          </div>
+          <div class="ml-bar-legend">
+            <span>0</span>
+            {% for b in ml.bands %}<span title="{{ b.level }}">{{ b.level[:2]|capitalize }} {{ b.stage }}</span>{% endfor %}
+          </div>
+          {% endif %}
+          {% if hz.mae %}
+          <div class="h-delta flat" style="margin-top:.4rem; font-size:.68rem;">
+            backtest MAE &plusmn;{{ "%.2f"|format(hz.mae) }} ft
+          </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if ml.probabilities %}
+    <div class="ml-probs">
+      <div class="dim" style="font-size:.72rem; margin-top:.5rem;">
+        Probability of exceeding each published flood stage
+      </div>
+      {% for pr in ml.probabilities %}
+        <div class="ml-prob {{ '' if pr.trustworthy else 'untrusted' }}">
+          <div>&gt; {{ pr.threshold }} ft
+            {%- if pr.threshold_label %} ({{ pr.threshold_label }}){% endif %}
+            within {{ pr.horizon_h }}h</div>
+          <div class="pbar">
+            <div class="fill" style="width:{{ pr.pct }}%; background:{{ pr.color }};"></div>
+          </div>
+          <div class="pct {{ pr.severity }}">
+            {{ pr.pct }}%
+            {% if pr.trustworthy and pr.auc %}
+              <span class="dim" style="font-weight:400; font-size:.65rem;"><br>AUC {{ "%.2f"|format(pr.auc) }}</span>
+            {% else %}
+              <span class="uncal">uncalibrated</span>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if ml.any_untrustworthy %}
+    <div class="ml-caveat">
+      <b>How much to believe this.</b> Stage predictions carry their measured
+      backtest error above. The exceedance probabilities marked
+      <em>uncalibrated</em> are not validated: the river has only crossed those
+      stages once in the {{ h.first_ts[:4] if vm.history else '2021' }}&ndash;present
+      record (Helene, September 2024), so the walk-forward backtest had a
+      positive example in a single fold and its AUC is undefined. Treat those
+      numbers as untested, not as evidence that flooding is unlikely.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Rainfall timing ────────────────────────────────────────────── #}
+  {% if vm.qpf %}
+  {% set q = vm.qpf %}
+  <div class="card span7">
+    <h2>Rainfall timing &mdash; next {{ q.hours }} h
+      <span class="ml-subtitle"><span>Open-Meteo hourly QPF</span></span>
+    </h2>
+    <div class="dim" style="font-size:.78rem; margin-bottom:.5rem;">
+      Three inches over three days is a wet week. Three inches in three hours
+      is a flash flood. The bars show which one is coming.
+    </div>
+    <svg class="qpf-bars" viewBox="0 0 {{ q.width }} {{ q.height }}"
+         preserveAspectRatio="none" role="img"
+         aria-label="Hourly rainfall forecast totalling {{ q.total_in }} inches over {{ q.hours }} hours">
+      {% for b in q.bars %}
+        <rect class="{{ b.cls }}" x="{{ b.x|round(2) }}" y="{{ b.y|round(2) }}"
+              width="{{ b.w|round(2) }}" height="{{ b.h|round(2) }}"><title>+{{ b.hour }}h: {{ b.inches }} in</title></rect>
+      {% endfor %}
+      <polyline class="qpf-cum" points="{{ q.cumulative }}"/>
+    </svg>
+    <div class="history-years">
+      {% for t in q.ticks %}<span style="left: {{ t.x_pct|round(2) }}%">{{ t.label }}</span>{% endfor %}
+    </div>
+    <div class="qpf-stats">
+      <div class="qpf-stat"><b>{{ q.total_in }} in</b>total over {{ q.hours }} h</div>
+      <div class="qpf-stat"><b>{{ q.max_6h_in }} in</b>wettest 6 h</div>
+      <div class="qpf-stat"><b>{{ q.max_24h_in }} in</b>wettest 24 h</div>
+      <div class="qpf-stat"><b>{{ q.peak_hour_in }} in</b>wettest single hour</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Current weather ────────────────────────────────────────────── #}
+  <div class="card span5">
+    <h2>Asheville weather</h2>
+    {% if data.weather and not data.weather.error %}
+      <div class="big">{{ data.weather.temp_f }}&deg;F</div>
+      <div class="row"><span>Humidity</span><span>{{ data.weather.humidity_pct }}%</span></div>
+      <div class="row"><span>Wind</span><span>{{ data.weather.wind_mph }} mph @ {{ data.weather.wind_dir_deg }}&deg;</span></div>
+      <div class="row"><span>Pressure</span><span>{{ data.weather.pressure_mb }} mb</span></div>
+      <div class="row"><span>Current precip</span><span>{{ data.weather.precip_in }} in</span></div>
+      <div class="row"><span>Next 72h precip</span><span><b>{{ data.weather.next_72h_precip_in }} in</b></span></div>
+      <div class="dim">Open-Meteo &middot; {{ data.weather.as_of }}</div>
+    {% else %}
+      <div class="dim">Weather feed unavailable</div>
+    {% endif %}
+  </div>
+
+  {% include "_heat.html" %}
+
+  {# ── Map + storms ───────────────────────────────────────────────── #}
+  <div class="card span8">
+    <h2>Situational map</h2>
+    <div id="map"></div>
+    {% if data.storms %}
+      <div class="dim" style="margin-top:.4rem; font-size:.75rem;">
+        Storm markers show the NHC current position; the dashed cone is the
+        official forecast track where NHC publishes one.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card span4">
+    <h2>Active Atlantic storms</h2>
+    {% if data.storms %}
+      <div class="scroll-x">
+      <table>
+        <tr><th>Name</th><th>Class</th><th>kt</th><th>mi</th></tr>
+        {% for s in data.storms %}
+        <tr>
+          <td><b>{{ s.name }}</b></td>
+          <td>{{ s.classification }}</td>
+          <td>{{ s.intensity_kt|round(0)|int if s.intensity_kt else "?" }}</td>
+          <td>{{ s.distance_mi|round(0)|int }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      </div>
+    {% else %}
+      <div class="dim">No active Atlantic storms.</div>
+      <div class="dim" style="margin-top:.5rem; font-size:.78rem;">
+        During an active system this card lists each storm's intensity and
+        distance, and the map draws its NHC forecast track.
+      </div>
+    {% endif %}
+  </div>
+
+  {# ── Alerts + season ────────────────────────────────────────────── #}
+  <div class="card span6">
+    <h2>NWS alerts (Asheville)</h2>
+    {% if data.alerts %}
+      {% for a in data.alerts %}
+        <div class="alert">
+          <b>{{ a.event }}</b> [{{ a.severity }}]<br>
+          <small>{{ a.headline }}</small>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="dim">No active watches/warnings/advisories.</div>
+    {% endif %}
+  </div>
+
+  <div class="card span6">
+    <h2>2026 CSU Atlantic outlook</h2>
+    <div class="row"><span>Named storms</span><span>{{ data.season.named_storms }} (climo 14.4)</span></div>
+    <div class="row"><span>Hurricanes</span><span>{{ data.season.hurricanes }} (climo 7.2)</span></div>
+    <div class="row"><span>Major hurricanes</span><span>{{ data.season.major_hurricanes }} (climo 3.2)</span></div>
+    <div class="row"><span>ACE</span><span>{{ data.season.ace }} (climo 123)</span></div>
+    <div class="row"><span>P(major US landfall)</span><span>{{ (data.season.p_us_major_landfall * 100)|round(0)|int }}%</span></div>
+    <div class="dim">Klotzbach et al., CSU, {{ data.season.issued }}</div>
+  </div>
+
+  {# ── Soil ───────────────────────────────────────────────────────── #}
+  <div class="card span6">
+    <h2>Soil + antecedent precip (Asheville)</h2>
+    {% if vm.soil %}
+      <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+        <div>
+          <div class="big">{{ "%.2f"|format(vm.soil.moisture) }}</div>
+          <div class="dim">m&sup3;/m&sup3; topsoil ({{ data.soil.condition }})</div>
+        </div>
+        <div class="breakdown">
+          <div class="seg" title="0-0.45 m3/m3">
+            <span style="width: {{ vm.soil.saturation_pct|round(1) }}%; background: {{ vm.soil.color }};"></span>
+          </div>
+          <div class="row"><span>Past 7d precip</span><span><b>{{ data.soil.past_7d_precip_in }} in</b></span></div>
+          <div class="row"><span>Topsoil 0-1 cm</span><span>{{ data.soil.soil_moisture_top }}</span></div>
+          <div class="row"><span>Shallow 1-3 cm</span><span>{{ data.soil.soil_moisture_shallow }}</span></div>
+          <div class="row"><span>Mid 3-9 cm</span><span>{{ data.soil.soil_moisture_mid }}</span></div>
+          <div class="row"><span>Root 9-27 cm</span><span>{{ data.soil.soil_moisture_root }}</span></div>
+        </div>
+      </div>
+      <div class="dim" style="margin-top:.5rem;">
+        Open-Meteo &middot; saturated &ge; 0.40 m&sup3;/m&sup3; &middot;
+        amplifier &times;{{ "%.2f"|format(vm.soil.amplifier) }}
+      </div>
+    {% else %}
+      <div class="dim">Soil data unavailable</div>
+    {% endif %}
+  </div>
+
+  {# ── Coast ──────────────────────────────────────────────────────── #}
+  <div class="card span6">
+    <h2>NC Coast &mdash; water level + wind (NOAA CO-OPS)</h2>
+    {% if data.coastal %}
+      <div class="scroll-x">
+      <table>
+        <tr><th>Station</th><th>Water (ft MLLW)</th><th>Wind (kt)</th><th>Press (mb)</th></tr>
+        {% for c in data.coastal %}
+        <tr>
+          <td><b>{{ c.label }}</b><br><span class="dim" style="font-size:.7rem;">{{ c.role }} &middot; {{ c.station_id }}</span></td>
+          <td>{{ "%.2f"|format(c.water_level_ft) if c.water_level_ft is not none else "?" }}</td>
+          <td>
+            {% if c.wind_kt is not none %}
+              {{ "%.0f"|format(c.wind_kt) }}
+              {% if c.wind_gust_kt %} (g {{ "%.0f"|format(c.wind_gust_kt) }}){% endif %}
+              {% if c.wind_dir_deg is not none %} @ {{ c.wind_dir_deg|round(0)|int }}&deg;{% endif %}
+            {% else %}?{% endif %}
+          </td>
+          <td>{{ "%.1f"|format(c.air_pressure_mb) if c.air_pressure_mb is not none else "?" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      </div>
+      <div class="dim" style="margin-top:.4rem;">
+        Storm-surge early-warning chain: pressure drops + wind backing + water rising = TC approach.
+      </div>
+    {% else %}
+      <div class="dim">CO-OPS feed unavailable</div>
+    {% endif %}
+  </div>
+
+  {% include "_buoys.html" %}
+  {% include "_forests.html" %}
+  {% include "_glossary.html" %}
+
+</div>
+
+<footer>
+  Data: USGS NWIS, NWS api.weather.gov + NWPS, NHC CurrentStorms, Open-Meteo,
+  NOAA CO-OPS, NDBC, CSU Tropical Met Project.
+</footer>
+
+<script id="map-state" type="application/json">{{ vm.map_state_json }}</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+</html>

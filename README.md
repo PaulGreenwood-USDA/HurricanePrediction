@@ -95,6 +95,9 @@ uv run hurricane-asheville dem
 # Live USGS gauge + NWS alerts for Asheville
 uv run hurricane-asheville gauge
 
+# Replay the Flood Index over history and validate it against Helene
+uv run hurricane-asheville index-replay
+
 # Run the live web dashboard (Flask) at http://127.0.0.1:5000
 uv run hurricane-asheville dashboard
 uv run hurricane-asheville dashboard --host 0.0.0.0 --port 8000 --debug
@@ -117,14 +120,23 @@ uv run hurricane-asheville dashboard
 Then open <http://127.0.0.1:5000>. The dashboard refreshes its underlying data
 every 60 seconds (in-process cache) and shows:
 
-- Asheville Flood Index (0–100) with color-coded label and component breakdown
-- Current French Broad stage vs action / minor / moderate / major / record
-- Active NHC Atlantic storms and distance to Asheville
-- Active NWS alerts for the Asheville point
-- Current weather (Open-Meteo)
-- Soil moisture and 7-day antecedent precipitation
+- Asheville Flood Index (0–100) with label, shape-coded severity and breakdown
+- Current French Broad stage vs that gauge's action / minor / moderate / major
+- **Stage history since 2021** with the Helene crest and NWS record as
+  reference lines, plus where today sits as a percentile *for this month*
+- **Hourly rainfall timing** — the 72 h total cannot tell a wet week from a
+  flash flood, so the page shows the hourly curve and the wettest 6 h / 24 h
+- ML stage forecast with its measured backtest error, and an explicit
+  *uncalibrated* marker on exceedance probabilities the backtest could not
+  validate (see [Method notes](#method-notes))
+- Active NHC Atlantic storms with their forecast track and cone of uncertainty
+- Active NWS alerts, current weather, soil moisture, 7-day antecedent precip
 - Live NOAA CO-OPS tide / surge observations for NC coastal stations
 - Per-forest weather + alerts for Pisgah / Nantahala / Uwharrie / Croatan
+
+The header states how old the data is and how often the page rebuilds. The
+staleness dot changes colour when a rebuild is missed rather than pulsing
+green regardless, and the page reloads only when a newer snapshot exists.
 
 ### Static snapshot (GitHub Pages)
 
@@ -132,7 +144,9 @@ every 60 seconds (in-process cache) and shows:
 uv run python build_static.py
 ```
 
-Renders the dashboard once and writes `site/index.html` + `site/state.json`.
+Renders the dashboard once and writes `site/index.html`, `site/state.json`
+and `site/static/` (CSS + JS). Asset URLs are rewritten to relative paths
+so the snapshot works under the Pages project subpath.
 
 ### Azure App Service
 
@@ -173,6 +187,53 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
   (≥ 0.40 m³/m³), 7-day antecedent precipitation, active flood / tropical
   alerts, and proximity of any active TC
   ([src/hurricane_asheville/index_score.py](src/hurricane_asheville/index_score.py)).
+- **Flood thresholds are per gauge.** Each USGS site sits on its own datum, so
+  every gauge is classified against its own NWS action / minor / moderate /
+  major stages from
+  [data/nws_flood_thresholds.json](data/nws_flood_thresholds.json). Gauges with
+  no published NWS thresholds render as *no thresholds* rather than being
+  measured against another river's numbers. Refresh the table with
+  `uv run python scripts/refresh_flood_thresholds.py` (slow by design — NWPS
+  allows 10 requests per 5 minutes).
+- **Reservoirs report pool elevation**, USGS parameter `00062`, not river stage
+  `00065` — Falls Lake reads ~249 ft against a 264 ft flood pool. NWS publishes
+  those thresholds in the same elevation datum, so reservoirs are classified
+  normally; the units travel with the number so a pool elevation is never shown
+  as a river stage.
+- **Gauge ids are pinned to their USGS station names** in
+  [tests/test_gauge_registry.py](tests/test_gauge_registry.py). Verify any new
+  site id against the USGS site service before adding it — a label and an id
+  that disagree will otherwise show one river's data under another's name.
+- **ML forecast honesty.** Stage regressions report their walk-forward MAE
+  (±0.12 ft at +6 h, ±0.55 ft at +72 h). Exceedance classifiers are trained on
+  the published flood stages (action 6.5 / minor 9.5 / moderate 13.0 ft) rather
+  than round numbers, and each is checked for whether the backtest ever saw its
+  positive class: the river has crossed minor flood **once** since 2021
+  (Helene), so those heads have a positive example in a single fold, an
+  undefined AUC, and are labelled *uncalibrated* on the page. The action-stage
+  heads are exceeded often enough to validate (AUC 0.99 at +6/+24 h). Metrics
+  are read from the model sidecars in `data/models/`, which ship with the repo —
+  the previous code read a `site/ml/summary.json` that only an explicit
+  `ml-backtest` run produces, so the deployed card had no accuracy context.
+- **Helene's chart peak is a floor, not the crest.** The USGS gauge recorded
+  18.47 ft before it stopped reporting; NWS carries the crest at 24.82 ft. The
+  history card says so rather than presenting the recorded value as the peak.
+- **The Flood Index has been validated against Helene.** `index-replay`
+  reconstructs historical inputs and runs the *same* scorer the live page uses
+  over 1,902 days (2021-05-27 to present). Result: Helene peaks at **96/100
+  (EMERGENCY)** on 2024-09-27 with **3 days of ALERT-or-above lead time**, and
+  only **12 of 1,902 days (0.63%)** ever reach ALERT — every one of them with a
+  named tropical system in range (Fred, Henri, Ida, Ian, Nicole, Helene). No
+  false positives in five years.
+
+  The replay is deliberately conservative in three of four respects: stage is a
+  daily mean rather than the crest, rate-of-rise is averaged over 24 h so a
+  flash rise barely registers, and NWS alert state is not archived so that
+  component is always zero. The fourth cuts the other way — rainfall uses what
+  actually fell, so it assumes a perfect 72-hour forecast and real lead time
+  would be shorter. Regenerate with
+  `uv run hurricane-asheville index-replay`, which writes
+  [data/index_validation.json](data/index_validation.json) for the dashboard.
 - HURDAT2 is cached in [data/hurdat2.txt](data/hurdat2.txt) and the elevation
   grid in [data/dem.npz](data/dem.npz) after first download.
 
@@ -182,11 +243,14 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
 | --------------------------------------- | --------- | ----------------------------------------- |
 | NOAA NHC HURDAT2                        | none      | Historical Atlantic best-tracks 1851–2025 |
 | NOAA NHC CurrentStorms.json             | none      | Active Atlantic storms                    |
+| NOAA NHC storm_graphics KMZ             | none      | Forecast track + cone of uncertainty      |
 | USGS NWIS Instantaneous Values          | none      | French Broad gauge (site 03451500)        |
 | api.weather.gov                         | none      | NWS active alerts                         |
 | Open-Meteo Forecast API                 | none      | Current weather + soil moisture           |
 | Open-Meteo Elevation API                | none      | DEM grid for orographic calc              |
 | NOAA CO-OPS datagetter                  | none      | Live NC tide / surge observations         |
+| NWS NWPS (api.water.noaa.gov)           | none      | Per-gauge flood thresholds (baked)        |
+| Open-Meteo ERA5 archive                 | none      | 5-year precip / soil-moisture backfill    |
 | CSU Tropical Meteorology Project (PDF)  | bundled   | 2026 seasonal forecast constants          |
 
 All HTTP calls have timeouts and degrade gracefully when a service is offline;
@@ -200,8 +264,12 @@ build_static.py               render dashboard once for GitHub Pages
 extract_pdf.py                pull text out of the bundled CSU PDF
 wsgi.py                       gunicorn entry point for Azure App Service
 infra/                        Bicep for App Service + supporting resources
+scripts/
+  refresh_flood_thresholds.py regenerate data/nws_flood_thresholds.json
 site/                         static snapshot output (index.html, state.json)
 data/                         hurdat2.txt + dem.npz cache
+  nws_flood_thresholds.json   per-gauge NWS flood stages (from NWPS)
+  index_validation.json       Flood Index replay summary (from index-replay)
 output/                       generated plots (e.g. tracks.png)
 src/hurricane_asheville/
   config.py        constants, Asheville lat/lon, CSU 2026 numbers, URLs
@@ -219,7 +287,13 @@ src/hurricane_asheville/
   forests.py       NC National Forests (Pisgah/Nantahala/Uwharrie/Croatan)
   tides.py         NOAA CO-OPS tide + meteorology stations
   index_score.py   Asheville Flood Index (AFI) composite 0-100
-  dashboard.py     Flask web dashboard
+  dashboard.py     Flask app: collection, view model assembly, routes
+  viewmodel.py     pure state -> render primitives (sparklines, bands, ML card)
+  stage_history.py long-run stage series + month-of-year percentile
+  storm_track.py   NHC forecast track / cone KMZ parsing
+  index_replay.py  historical Flood Index replay + Helene validation
+  templates/       dashboard.html + card partials
+  static/          dashboard.css, dashboard.js
   cli.py           argparse entry point
 tests/                        pytest suite (conftest stubs out network)
 ```

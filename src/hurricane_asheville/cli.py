@@ -349,6 +349,57 @@ def cmd_ml_backtest(args):
     print(f"Wrote plots and summary -> {out}")
 
 
+def cmd_index_replay(args):
+    """Replay the Flood Index over the historical record and validate it."""
+    from .index_replay import (VALIDATION_PATH, build_validation,
+                                event_summary, replay, write_validation)
+
+    result = replay(start=args.start, end=args.end)
+    if not result.days:
+        print("No replay produced. Notes: " + "; ".join(result.notes))
+        return
+
+    print(f"Replayed {len(result.days):,} days "
+          f"({result.first_date} -> {result.last_date})")
+    print("Label distribution: " + ", ".join(
+        f"{k}={v}" for k, v in sorted(result.label_counts.items(),
+                                       key=lambda kv: -kv[1])))
+
+    summary = build_validation(result, event_date=args.event_date,
+                                event_name=args.event_name)
+    ev = summary.get("event", {})
+    base = summary.get("base_rate", {})
+    print()
+    print(f"{args.event_name} ({args.event_date}): "
+          f"score {ev.get('score')} / 100 = {ev.get('label')}, "
+          f"{ev.get('lead_days')} days of ALERT+ warning beforehand")
+    print(f"Base rate: {base.get('alert_or_above_days')} of "
+          f"{base.get('total_days'):,} days at ALERT or above "
+          f"({base.get('pct')}%), {base.get('with_named_storm')} of those "
+          f"with a named storm in range")
+
+    print()
+    print(f"{'date':12} {'score':>5} {'label':11} {'stage':>7} {'72h in':>7}  storm")
+    top = sorted(result.days, key=lambda d: -d.score)[:args.top]
+    for d in sorted(top, key=lambda d: d.date):
+        stage = f"{d.stage_ft:.2f}" if d.stage_ft is not None else "-"
+        precip = f"{d.precip_72h_in:.2f}" if d.precip_72h_in is not None else "-"
+        storm = (f"{d.storm_name} {d.nearest_storm_mi:.0f}mi"
+                 if d.storm_name and d.nearest_storm_mi is not None else "")
+        print(f"{d.date:12} {d.score:>5} {d.label:11} {stage:>7} {precip:>7}  {storm}")
+
+    print()
+    print("Caveats:")
+    for n in result.notes:
+        print(f"  - {n}")
+
+    if not args.no_write:
+        path = write_validation(result, args.write or VALIDATION_PATH,
+                                 event_date=args.event_date,
+                                 event_name=args.event_name)
+        print(f"\nwrote {path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hurricane-asheville",
                                 description="Hurricane risk analysis for Asheville, NC.")
@@ -453,6 +504,21 @@ def build_parser() -> argparse.ArgumentParser:
     mbt.add_argument("--out", default="site/ml",
                       help="Output directory (default: site/ml).")
     mbt.set_defaults(func=cmd_ml_backtest)
+
+    ir = sub.add_parser(
+        "index-replay",
+        help="Replay the Flood Index across history and validate it on Helene.")
+    ir.add_argument("--start", default=None)
+    ir.add_argument("--end", default=None)
+    ir.add_argument("--event-date", default="2024-09-27", dest="event_date")
+    ir.add_argument("--event-name", default="Helene", dest="event_name")
+    ir.add_argument("--top", type=int, default=15,
+                     help="How many highest-scoring days to print.")
+    ir.add_argument("--write", default=None,
+                     help="Write the validation summary to this path "
+                          "(default: data/index_validation.json).")
+    ir.add_argument("--no-write", action="store_true", dest="no_write")
+    ir.set_defaults(func=cmd_index_replay)
     return p
 
 

@@ -90,6 +90,22 @@ def _block_real_network(monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_nwps_cache():
+    """Clear the process-local NWPS forecast cache between tests.
+
+    It is module state with a 30-minute TTL, so without this a response
+    mocked in one test would leak into the next one's assertions.
+    """
+    from hurricane_asheville import gauge as gauge_mod
+
+    gauge_mod._NWPS_CACHE.clear()
+    gauge_mod._NWPS_BACKOFF_UNTIL = 0.0
+    yield
+    gauge_mod._NWPS_CACHE.clear()
+    gauge_mod._NWPS_BACKOFF_UNTIL = 0.0
+
+
 @pytest.fixture
 def tmp_cache(tmp_path: Path) -> Path:
     """Isolated cache dir per test."""

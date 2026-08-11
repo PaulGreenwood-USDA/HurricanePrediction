@@ -88,7 +88,9 @@ def fetch_current_weather(lat: float, lon: float, timeout: int = 15) -> dict:
 
     cur = data.get("current", {})
     hourly = data.get("hourly", {})
-    next_72h_precip = sum(hourly.get("precipitation", [])[:72])
+    precip_series = [v if isinstance(v, (int, float)) else 0.0
+                     for v in (hourly.get("precipitation") or [])[:72]]
+    next_72h_precip = sum(precip_series)
 
     temp_f = cur.get("temperature_2m")
     rh = cur.get("relative_humidity_2m")
@@ -124,4 +126,41 @@ def fetch_current_weather(lat: float, lon: float, timeout: int = 15) -> dict:
             )
             if t is not None and r is not None
         ],
+        # The 72 h total hides the variable that actually decides whether a
+        # storm floods: 3 inches over three days is a wet week, 3 inches in
+        # three hours is a flash flood. Ship the curve and the peak rates.
+        "hourly_precip_in": precip_series,
+        "hourly_precip_times": list((hourly.get("time") or [])[:72]),
+        **_precip_intensity(precip_series),
+    }
+
+
+def _rolling_max(values: list[float], window: int) -> float:
+    """Largest total falling in any ``window``-hour stretch."""
+    if not values or window <= 0:
+        return 0.0
+    if len(values) <= window:
+        return round(sum(values), 2)
+    best = running = sum(values[:window])
+    for i in range(window, len(values)):
+        running += values[i] - values[i - window]
+        best = max(best, running)
+    return round(best, 2)
+
+
+def _precip_intensity(series: list[float]) -> dict:
+    """Peak accumulation over short windows, plus when the wettest hour lands.
+
+    Flash-flood guidance for the southern Blue Ridge sits near 2-3 in in
+    6 h on saturated soil, so a 6 h peak is the decision-relevant number.
+    """
+    if not series:
+        return {"max_6h_precip_in": 0.0, "max_24h_precip_in": 0.0,
+                "peak_hour_index": None, "peak_hour_precip_in": 0.0}
+    peak_idx = max(range(len(series)), key=lambda i: series[i])
+    return {
+        "max_6h_precip_in": _rolling_max(series, 6),
+        "max_24h_precip_in": _rolling_max(series, 24),
+        "peak_hour_index": peak_idx if series[peak_idx] > 0 else None,
+        "peak_hour_precip_in": round(series[peak_idx], 2),
     }

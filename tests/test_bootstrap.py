@@ -1,6 +1,10 @@
 """Tests for the historical bootstrap loaders (USGS DV + ERA5 archive)."""
 from __future__ import annotations
 
+import pytest
+
+from hurricane_asheville import bootstrap
+
 
 def _usgs_dv_payload():
     return {
@@ -126,3 +130,71 @@ def test_bootstrap_all_writes_partitions(monkeypatch, fake_response, tmp_path):
 
     df = history.load_history(base_dir=tmp_path)
     assert set(df["source"].unique()) == {"usgs_dv", "open_meteo_archive"}
+
+
+# ---- reservoir pool elevation ---------------------------------------------
+
+def test_usgs_dv_parses_pool_elevation(monkeypatch, fake_response):
+    """Reservoirs report 00062, not 00065. Asking only for stage returned
+    nothing at all for Falls Lake and almost nothing for Jordan Lake."""
+    payload = {"value": {"timeSeries": [{
+        "variable": {"variableCode": [{"value": "00062"}]},
+        "values": [{"value": [
+            {"dateTime": "2024-09-27T00:00:00.000", "value": "248.9"},
+        ]}],
+    }]}}
+    monkeypatch.setattr(bootstrap.requests, "get",
+                        lambda *a, **k: fake_response(json_data=payload))
+    rows = bootstrap.fetch_usgs_dv("02087182", "2024-09-01", "2024-09-30")
+    assert len(rows) == 1
+    assert rows[0]["metric"] == "pool_elevation_ft"
+    assert rows[0]["value"] == 248.9
+
+
+def test_usgs_dv_requests_all_three_parameters(monkeypatch, fake_response):
+    seen = {}
+
+    def fake_get(url, params=None, **k):
+        seen.update(params or {})
+        return fake_response(json_data={"value": {"timeSeries": []}})
+
+    monkeypatch.setattr(bootstrap.requests, "get", fake_get)
+    bootstrap.fetch_usgs_dv("02087182", "2024-09-01", "2024-09-30")
+    assert "00062" in seen["parameterCd"]
+
+
+# ---- soil moisture backfill -----------------------------------------------
+
+def test_soil_hourly_reduced_to_daily_mean():
+    """Five years hourly at 13 points is ~1.1M values; consumers work daily."""
+    data = {"hourly": {
+        "time": ["2024-09-27T00:00", "2024-09-27T12:00", "2024-09-28T00:00"],
+        "soil_moisture_0_to_7cm": [0.50, 0.54, 0.48],
+        "soil_moisture_7_to_28cm": [0.40, 0.42, 0.38],
+    }}
+    rows = bootstrap._soil_to_daily_rows(data, "point", "asheville")
+    top = {r["ts"]: r["value"] for r in rows if r["metric"] == "soil_era5_0_7cm"}
+    assert top["2024-09-27"] == pytest.approx(0.52)
+    assert top["2024-09-28"] == pytest.approx(0.48)
+    assert {r["metric"] for r in rows} == {"soil_era5_0_7cm", "soil_era5_7_28cm"}
+
+
+def test_soil_metric_names_do_not_collide_with_live_feed():
+    """ERA5 offers 0-7 cm; the live feed reads 0-1 cm. Same quantity, different
+    measurement -- they must not concatenate into one series that silently
+    changes definition partway through."""
+    assert "soil_era5" in "".join(bootstrap._SOIL_VAR_TO_METRIC.values())
+    assert "soil_moisture_top" not in bootstrap._SOIL_VAR_TO_METRIC.values()
+
+
+def test_soil_rows_skip_nulls():
+    data = {"hourly": {"time": ["2024-09-27T00:00", "2024-09-27T01:00"],
+                       "soil_moisture_0_to_7cm": [None, 0.5],
+                       "soil_moisture_7_to_28cm": [None, None]}}
+    rows = bootstrap._soil_to_daily_rows(data, "point", "asheville")
+    assert len(rows) == 1
+    assert rows[0]["value"] == pytest.approx(0.5)
+
+
+def test_soil_empty_payload():
+    assert bootstrap._soil_to_daily_rows({}, "point", "asheville") == []

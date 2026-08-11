@@ -93,6 +93,92 @@ def test_index_route_returns_html(client):
     assert "Flood Index" in body or "flood index" in body.lower()
 
 
+def test_page_declares_mobile_viewport(client):
+    """Without this the page falls back to a 980px viewport and renders
+    zoomed-out on phones -- the primary device during a flood event."""
+    body = client.get("/").get_data(as_text=True)
+    assert 'name="viewport"' in body
+    assert "width=device-width" in body
+
+
+def test_page_links_external_css_and_js(client):
+    """Markup, styles and script are separate files now; a regression back to
+    one inline blob would make the state payload ship twice again."""
+    body = client.get("/").get_data(as_text=True)
+    assert "dashboard.css" in body
+    assert "dashboard.js" in body
+    assert "const STATE = {" not in body
+
+
+def test_map_payload_excludes_gauge_history(client, fake_state):
+    """The map never reads per-gauge history; inlining it doubled page size."""
+    fake_state["gauges"] = [
+        {"site_id": "03451500", "label": "French Broad @ Asheville",
+         "role": "primary", "lat": 35.6, "lon": -82.6, "stage_ft": 1.67,
+         "display_ft": 1.67, "display_units": "ft", "pool_elevation_ft": None,
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": None, "thresholds_label": "", "rate_ft_per_hr": 0.0,
+         "history": [{"t": f"2026-08-10T{h:02d}:00", "ft": 1.6} for h in range(24)],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+    ]
+    payload = dashboard.map_state(fake_state)
+    assert payload["gauges"][0]["site_id"] == "03451500"
+    assert "history" not in payload["gauges"][0]
+    assert "nwps_forecast" not in payload["gauges"][0]
+
+
+def test_stage_pills_use_single_token_classes(client, fake_state):
+    """Regression: the template derived pill classes by munging the label,
+    so 'below action' produced class="stage-pill below action" and matched
+    the '.stage-pill.action' rule -- every safe gauge looked like a warning."""
+    fake_state["gauges"] = [
+        {"site_id": "03451500", "label": "French Broad @ Asheville",
+         "role": "primary", "lat": 35.6, "lon": -82.6, "stage_ft": 1.67,
+         "pool_elevation_ft": None, "display_ft": 1.67, "display_units": "ft",
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": {"action": 6.5, "minor": 9.5,
+                        "moderate": 13.0, "major": 18.0},
+         "thresholds_label": "NWS flood stages here: action 6.5 ft",
+         "rate_ft_per_hr": 0.0, "history": [],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+        {"site_id": "02087182", "label": "Falls Lake above dam",
+         "role": "reservoir", "lat": 35.94, "lon": -78.58, "stage_ft": None,
+         "pool_elevation_ft": 248.90, "display_ft": 248.90,
+         "display_units": "ft pool elev",
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": {"action": 264.0, "minor": 265.0,
+                        "moderate": 266.0, "major": 267.0},
+         "thresholds_label": "NWS flood stages here: action 264 ft pool elev",
+         "rate_ft_per_hr": 0.0, "history": [],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+    ]
+    body = client.get("/").get_data(as_text=True)
+    assert 'class="stage-pill below-action"' in body
+    assert 'class="stage-pill below action"' not in body
+
+
+def test_reservoir_row_shows_pool_elevation_with_units(client, fake_state):
+    """A reservoir reports 00062 pool elevation, not river stage. Before the
+    dashboard requested 00062 the row rendered a bare '?'."""
+    fake_state["gauges"] = [
+        {"site_id": "02087182", "label": "Falls Lake above dam",
+         "role": "reservoir", "lat": 35.94, "lon": -78.58, "stage_ft": None,
+         "pool_elevation_ft": 248.90, "display_ft": 248.90,
+         "display_units": "ft pool elev",
+         "flood_category": "below action", "flood_class": "below-action",
+         "thresholds": None, "thresholds_label": "",
+         "rate_ft_per_hr": 0.0, "history": [],
+         "eta_minor_hr": None, "eta_moderate_hr": None, "eta_major_hr": None,
+         "nwps_forecast": None},
+    ]
+    body = client.get("/").get_data(as_text=True)
+    assert "248.90" in body
+    assert "ft pool elev" in body
+
+
 def test_api_state_returns_json(client, fake_state):
     resp = client.get("/api/state")
     assert resp.status_code == 200

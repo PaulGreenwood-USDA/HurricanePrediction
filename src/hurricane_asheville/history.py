@@ -318,6 +318,46 @@ def pivot_metric(df, *, metric: str, entity_id: str | None = None):
                             values="value", aggfunc="last")
 
 
+def drop_entities(entity_ids: Iterable[str],
+                   *, entity_type: str | None = None,
+                   base_dir: Path | str = DEFAULT_HISTORY_DIR,
+                   dry_run: bool = False) -> dict:
+    """Delete every row for the given entity ids, partition by partition.
+
+    Needed when a gauge id turns out to have been wrong: the rows are real
+    measurements, but of a different river than the label claimed, so leaving
+    them in place would silently mix two watersheds into one series.
+
+    Returns ``{"scanned": n, "removed": n, "partitions_rewritten": n}``.
+    """
+    import pandas as pd
+
+    targets = {str(e) for e in entity_ids}
+    if not targets:
+        return {"scanned": 0, "removed": 0, "partitions_rewritten": 0}
+
+    scanned = removed = rewritten = 0
+    for part in list_partitions(base_dir):
+        df = pd.read_parquet(part)
+        scanned += len(df)
+        mask = df["entity_id"].isin(targets)
+        if entity_type is not None:
+            mask &= df["entity_type"] == entity_type
+        hits = int(mask.sum())
+        if not hits:
+            continue
+        removed += hits
+        rewritten += 1
+        if not dry_run:
+            keep = df[~mask].reset_index(drop=True)
+            if keep.empty:
+                part.unlink()
+            else:
+                keep.to_parquet(part, index=False)
+    return {"scanned": scanned, "removed": removed,
+            "partitions_rewritten": rewritten}
+
+
 def history_stats(base_dir: Path | str = DEFAULT_HISTORY_DIR) -> dict:
     """Tiny audit summary, suitable for `cli ml-history-info`."""
     parts = list_partitions(base_dir)
