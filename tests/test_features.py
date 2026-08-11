@@ -188,3 +188,90 @@ def test_build_training_frame_dropna_features(hist_df):
                                      dropna_features=True)
     feat_cols = [c for c in frame.columns if not c.startswith("y_")]
     assert not frame[feat_cols].isna().any().any()
+
+
+# ---- exogenous inputs -----------------------------------------------------
+
+def test_precip_features_are_built_from_the_prefixed_metric():
+    """Regression: features.py asked for 'precip_in_24h' while the store
+    writes 'wx_precip_in_24h', so the block was skipped in silence and every
+    model trained on river stage alone -- no rainfall at all."""
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    idx = pd.date_range("2024-09-20", periods=200, freq="h", tz="UTC")
+    rows = []
+    for t in idx:
+        rows.append({"ts": t, "source": "usgs_dv", "entity_type": "gauge",
+                     "entity_id": "G", "metric": "stage_ft", "value": 2.0})
+        rows.append({"ts": t, "source": "open_meteo_archive",
+                     "entity_type": "point", "entity_id": "asheville",
+                     "metric": "wx_precip_in_24h", "value": 0.1})
+    df = pd.DataFrame(rows)
+    out = F.build_gauge_features(df, "G", upstream_ids=[],
+                                  precip_entity_id="asheville")
+    precip_cols = [c for c in out.columns if "precip" in c]
+    assert precip_cols, "precipitation features missing"
+    assert out[precip_cols].notna().any().any()
+
+
+def test_soil_features_are_built():
+    """Soil moisture is the pre-conditioner that decides whether rain runs
+    off; it had five years of history and no feature."""
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    idx = pd.date_range("2024-09-20", periods=200, freq="h", tz="UTC")
+    rows = []
+    for t in idx:
+        rows.append({"ts": t, "source": "usgs_dv", "entity_type": "gauge",
+                     "entity_id": "G", "metric": "stage_ft", "value": 2.0})
+        rows.append({"ts": t, "source": "open_meteo_archive",
+                     "entity_type": "point", "entity_id": "asheville",
+                     "metric": "soil_era5_0_7cm", "value": 0.42})
+    df = pd.DataFrame(rows)
+    out = F.build_gauge_features(df, "G", upstream_ids=[],
+                                  precip_entity_id="asheville")
+    assert [c for c in out.columns if "soil" in c]
+
+
+def test_first_available_falls_back_across_metric_names():
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    idx = pd.date_range("2024-09-20", periods=10, freq="h", tz="UTC")
+    df = pd.DataFrame([{"ts": t, "source": "s", "entity_type": "point",
+                        "entity_id": "asheville", "metric": "wx_precip_in_24h",
+                        "value": 1.0} for t in idx])
+    s = F._first_available(df, "asheville",
+                            ("precip_in_24h", "wx_precip_in_24h"), "h")
+    assert not s.empty
+
+
+def test_first_available_returns_empty_when_nothing_matches():
+    import pandas as pd
+    from hurricane_asheville import features as F
+    df = pd.DataFrame(columns=["ts", "source", "entity_type",
+                                "entity_id", "metric", "value"])
+    assert F._first_available(df, "asheville", ("a", "b"), "h").empty
+
+
+def test_forecast_qpf_is_not_a_feature():
+    """wx_next_72h_precip_in covers ~4% of the frame, all of it in the final
+    walk-forward fold, so including it teaches the model a time signal
+    rather than hydrology."""
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    idx = pd.date_range("2024-09-20", periods=200, freq="h", tz="UTC")
+    rows = []
+    for t in idx:
+        rows.append({"ts": t, "source": "usgs_dv", "entity_type": "gauge",
+                     "entity_id": "G", "metric": "stage_ft", "value": 2.0})
+        rows.append({"ts": t, "source": "snapshot", "entity_type": "point",
+                     "entity_id": "asheville",
+                     "metric": "wx_next_72h_precip_in", "value": 1.0})
+    df = pd.DataFrame(rows)
+    out = F.build_gauge_features(df, "G", upstream_ids=[],
+                                  precip_entity_id="asheville")
+    assert not [c for c in out.columns if "qpf" in c.lower()]

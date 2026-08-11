@@ -126,9 +126,10 @@ every 60 seconds (in-process cache) and shows:
   reference lines, plus where today sits as a percentile *for this month*
 - **Hourly rainfall timing** — the 72 h total cannot tell a wet week from a
   flash flood, so the page shows the hourly curve and the wettest 6 h / 24 h
-- ML stage forecast with its measured backtest error, and an explicit
-  *uncalibrated* marker on exceedance probabilities the backtest could not
-  validate (see [Method notes](#method-notes))
+- ML flood probability for the action stage, the only head that beats its
+  naive baseline. The stage regression is **withheld** because it loses to
+  "assume no change" at every horizon, and the card says so rather than
+  quietly omitting it (see [Method notes](#method-notes))
 - Active NHC Atlantic storms with their forecast track and cone of uncertainty
 - Active NWS alerts, current weather, soil moisture, 7-day antecedent precip
 - Live NOAA CO-OPS tide / surge observations for NC coastal stations
@@ -204,17 +205,36 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
   [tests/test_gauge_registry.py](tests/test_gauge_registry.py). Verify any new
   site id against the USGS site service before adding it — a label and an id
   that disagree will otherwise show one river's data under another's name.
-- **ML forecast honesty.** Stage regressions report their walk-forward MAE
-  (±0.12 ft at +6 h, ±0.55 ft at +72 h). Exceedance classifiers are trained on
-  the published flood stages (action 6.5 / minor 9.5 / moderate 13.0 ft) rather
-  than round numbers, and each is checked for whether the backtest ever saw its
-  positive class: the river has crossed minor flood **once** since 2021
-  (Helene), so those heads have a positive example in a single fold, an
-  undefined AUC, and are labelled *uncalibrated* on the page. The action-stage
-  heads are exceeded often enough to validate (AUC 0.99 at +6/+24 h). Metrics
-  are read from the model sidecars in `data/models/`, which ship with the repo —
-  the previous code read a `site/ml/summary.json` that only an explicit
-  `ml-backtest` run produces, so the deployed card had no accuracy context.
+- **ML forecast honesty.** Every model is scored against a naive baseline on
+  the same walk-forward folds, and `serving.py` refuses to publish one that
+  loses. Results for the French Broad at Asheville:
+
+  | head | metric | naive baseline | served? |
+  | --- | --- | --- | --- |
+  | stage regression +6/+24/+72 h | MAE 0.12 / 0.23 / 0.55 ft | persistence 0.03 / 0.10 / 0.26 ft | **no — 2-4x worse** |
+  | P(> action 6.5 ft) +6/+24/+72 h | AUC 0.98 / 0.99 / 0.78 | 0.96 / 0.87 / 0.75 | yes |
+  | P(> minor 9.5 ft), P(> moderate 13 ft) | AUC undefined | — | no |
+
+  The stage regression loses to "assume no change" at every horizon *and in
+  every regime* — on rows whose future crest passes minor flood it is off by
+  ~7 ft where persistence is off by ~1 ft, because a model trained on a
+  record that is 99.7% calm regresses to the mean exactly when the river is
+  rising. It is therefore withheld, and the dashboard says so. Adding
+  rainfall and soil features (see below) did not change this, so the target
+  itself is the problem, not the inputs.
+
+  Minor and moderate exceedance have been crossed once since 2021 (Helene),
+  giving a positive example in a single fold and an undefined AUC. Only the
+  action-stage heads are calibrated and served.
+
+- **The models had never seen rainfall.** `features.py` requested
+  `precip_in_24h` while the store writes `wx_precip_in_24h` (history adds the
+  `wx_` prefix), so the block was skipped without error and every model
+  trained before this fix used river stage alone — 83 features, all of them
+  self- or upstream-stage. Precipitation and ERA5 soil moisture are now wired
+  in (111 columns, ~95% coverage). Forecast QPF is deliberately excluded: it
+  covers ~4% of rows, all in the final fold, so it would teach a time signal
+  rather than hydrology.
 - **Helene's chart peak is a floor, not the crest.** The USGS gauge recorded
   18.47 ft before it stopped reporting; NWS carries the crest at 24.82 ft. The
   history card says so rather than presenting the recorded value as the peak.

@@ -230,6 +230,13 @@ def ml_card(state: dict) -> dict | None:
         })
     probabilities.sort(key=lambda p: (p["horizon_h"], p["threshold"] or 0))
 
+    # The stage regression is withheld when it loses to persistence, which it
+    # currently does at every horizon. The card then carries exceedance
+    # probabilities only, and says why the forecast is absent rather than
+    # silently dropping a section the reader saw yesterday.
+    withheld = [k.replace("regression_h", "") for k, m in metrics.items()
+                if k.startswith("regression_h") and m.get("beats_baseline") is False]
+
     return {
         "site": site,
         "bands": bands,
@@ -238,6 +245,12 @@ def ml_card(state: dict) -> dict | None:
         "probabilities": probabilities,
         "any_untrustworthy": any(not p["trustworthy"] for p in probabilities),
         "trained_ts": ml.get("trained_ts") or _first_trained(ml),
+        "withheld_regression_horizons": sorted(withheld, key=lambda h: int(h)),
+        "baseline_mae": {
+            k.replace("regression_h", ""): m.get("baseline_mae")
+            for k, m in metrics.items() if k.startswith("regression_h")
+        },
+        "current_ft": current,
     }
 
 

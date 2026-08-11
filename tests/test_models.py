@@ -215,3 +215,77 @@ def test_default_model_path_layout(tmp_path):
     p = M.default_model_path("03451500", "regression", 24, base_dir=tmp_path)
     assert p.name == "regression_h24.joblib"
     assert p.parent.name == "03451500"
+
+
+# ---- naive baseline gate --------------------------------------------------
+
+def _tiny_frame(n=400, flood=False):
+    """Autoregressive stage series with an optional flood spike."""
+    import numpy as np
+    import pandas as pd
+    idx = pd.date_range("2024-01-01", periods=n, freq="h", tz="UTC")
+    rng = np.random.default_rng(0)
+    stage = np.cumsum(rng.normal(0, 0.01, n)) + 2.0
+    if flood:
+        stage[n // 2:n // 2 + max(10, n // 50)] += 8.0
+    df = pd.DataFrame({"self__stage_ft": stage}, index=idx)
+    df["y_future_max_6h"] = (df["self__stage_ft"][::-1]
+                             .rolling(6, min_periods=1).max()[::-1])
+    return df
+
+
+def test_baseline_metrics_scores_persistence():
+    from hurricane_asheville import models as M
+    frame = _tiny_frame()
+    X, y, _ = M._split_X_y(frame, "y_future_max_6h")
+    base = M._baseline_metrics(X, y, "regression", n_folds=3)
+    assert base["kind"] == "persistence"
+    assert base["mae"] >= 0.0
+
+
+def test_baseline_absent_without_the_stage_column():
+    import pandas as pd
+    from hurricane_asheville import models as M
+    frame = pd.DataFrame({"other": [1.0] * 50, "y_future_max_6h": [1.0] * 50})
+    X, y, _ = M._split_X_y(frame, "y_future_max_6h")
+    assert M._baseline_metrics(X, y, "regression") is None
+
+
+def test_beats_baseline_direction_by_kind():
+    from hurricane_asheville import models as M
+    # regression: lower MAE wins
+    assert M._beats_baseline(0.1, {"mae": 0.2}, "regression") is True
+    assert M._beats_baseline(0.3, {"mae": 0.2}, "regression") is False
+    # classification: higher AUC wins
+    assert M._beats_baseline(0.9, {"auc": 0.8}, "classification") is True
+    assert M._beats_baseline(0.7, {"auc": 0.8}, "classification") is False
+
+
+def test_beats_baseline_none_when_unmeasurable():
+    from hurricane_asheville import models as M
+    assert M._beats_baseline(None, {"mae": 0.2}, "regression") is None
+    assert M._beats_baseline(0.2, {}, "regression") is None
+
+
+def test_train_records_baseline_and_verdict():
+    """Without this recorded, a model 4x worse than doing nothing ships
+    looking respectable."""
+    from hurricane_asheville import models as M
+    bundle = M.train_with_backtest(_tiny_frame(), "G", 6, n_folds=3)
+    assert "baseline" in bundle.metrics
+    assert bundle.metrics["beats_baseline"] in (True, False)
+    assert bundle.metrics["baseline"]["kind"] == "persistence"
+
+
+def test_event_conditional_metrics_present_for_regression():
+    """An overall MAE is dominated by calm rows; the flood-day figure has to
+    be recorded separately or poor event performance stays invisible."""
+    from hurricane_asheville import models as M
+    # Needs enough rows that the top 1% is a usable sample -- the real frame
+    # has ~45k, so 1% is ~450 rows.
+    bundle = M.train_with_backtest(_tiny_frame(n=2000, flood=True), "G", 6,
+                                    n_folds=3)
+    ev = bundle.metrics.get("event")
+    assert ev is not None
+    assert ev["n_rows"] >= 10
+    assert ev["persistence_mae"] >= 0.0

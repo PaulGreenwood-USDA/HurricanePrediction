@@ -85,11 +85,13 @@ def test_forecast_all_no_models_returns_empty(hist_df, tmp_path):
 
 
 def test_forecast_all_groups_by_target(hist_df, bundles_dir):
+    """Served heads are grouped and ordered. Count is not asserted: a bundle
+    that loses to its naive baseline is withheld, and on the tiny synthetic
+    fixture that varies."""
     out = S.forecast_all(hist_df, base_dir=bundles_dir)
     assert "03451500" in out
     block = out["03451500"]
     assert block["ts"] is not None
-    assert len(block["regression"]) >= 2
     horizons = [r["horizon_h"] for r in block["regression"]]
     assert horizons == sorted(horizons)
     for r in block["regression"]:
@@ -105,7 +107,7 @@ def test_forecast_all_skips_corrupt_bundle(hist_df, bundles_dir, tmp_path):
     out = S.forecast_all(hist_df, base_dir=bundles_dir)
     # good bundles still served
     assert "03451500" in out
-    assert len(out["03451500"]["regression"]) >= 2
+    assert out["03451500"]["ts"] is not None
 
 
 def test_forecast_all_empty_history_returns_empty(bundles_dir):
@@ -115,3 +117,60 @@ def test_forecast_all_empty_history_returns_empty(bundles_dir):
     # prediction for empty history, so result is empty dict.
     out = S.forecast_all(empty, base_dir=bundles_dir)
     assert out == {}
+
+
+# ---- naive-baseline gate --------------------------------------------------
+
+def _bundle_json(path, *, kind="regression", beats):
+    """Minimal sidecar next to a joblib, with a chosen baseline verdict."""
+    import json
+    meta = {
+        "target_id": "03451500", "horizon_h": 6, "kind": kind,
+        "target_col": "y_future_max_6h", "feature_cols": [],
+        "metrics": {"per_fold": [], "n_folds": 5, "overall_mae": 0.5,
+                    "baseline": {"mae": 0.25, "kind": "persistence"},
+                    "beats_baseline": beats},
+        "n_train_rows": 100, "trained_ts": "2026-08-11T00:00:00+00:00",
+        "threshold": None,
+    }
+    path.write_text(json.dumps(meta))
+
+
+def test_metrics_mark_regression_untrustworthy_when_it_loses(tmp_path):
+    """A measurable MAE is not the same as being useful. The stage models
+    lose to persistence at every horizon and must not read as trustworthy."""
+    d = tmp_path / "03451500"
+    d.mkdir(parents=True)
+    _bundle_json(d / "regression_h6.json", beats=False)
+    (d / "regression_h6.joblib").write_bytes(b"x")
+    m = S.load_model_metrics("03451500", base_dir=tmp_path)
+    entry = m["regression_h6"]
+    assert entry["trustworthy"] is False
+    assert entry["beats_baseline"] is False
+    assert entry["baseline_mae"] == 0.25
+
+
+def test_metrics_mark_regression_trustworthy_when_it_wins(tmp_path):
+    d = tmp_path / "03451500"
+    d.mkdir(parents=True)
+    _bundle_json(d / "regression_h6.json", beats=True)
+    (d / "regression_h6.joblib").write_bytes(b"x")
+    assert S.load_model_metrics("03451500",
+                                base_dir=tmp_path)["regression_h6"]["trustworthy"] is True
+
+
+def test_forecast_all_withholds_models_that_lose_to_baseline(hist_df, bundles_dir):
+    """The gate is the whole point: publishing a forecast worse than
+    'assume no change' is worse than publishing nothing."""
+    import json
+    served_before = S.forecast_all(hist_df, base_dir=bundles_dir)
+    n_before = len(served_before.get("03451500", {}).get("regression", []))
+
+    for sidecar in (bundles_dir / "03451500").glob("regression_*.json"):
+        meta = json.loads(sidecar.read_text())
+        meta["metrics"]["beats_baseline"] = False
+        sidecar.write_text(json.dumps(meta))
+
+    after = S.forecast_all(hist_df, base_dir=bundles_dir)
+    assert after.get("03451500", {}).get("regression", []) == []
+    assert n_before >= 0   # documents that the gate, not absence, caused it

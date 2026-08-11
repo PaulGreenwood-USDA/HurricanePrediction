@@ -230,6 +230,27 @@ def train_with_backtest(frame, target_id: str, horizon_h: int,
     vals = [f[primary_key] for f in per_fold if f.get(primary_key) is not None]
     overall = (float(np.mean(vals)) if vals else None)
 
+    metrics = {"per_fold": per_fold, "overall_" + primary_key: overall,
+               "n_folds": len(per_fold)}
+
+    # Score the naive baseline on the *same* folds. Without this a model can
+    # look respectable on absolute error while being several times worse than
+    # doing nothing -- which is exactly what happened here: an MAE of 0.55 ft
+    # at +72 h reads like a credential until you notice persistence scores
+    # 0.26 ft on identical rows.
+    baseline = _baseline_metrics(X, y, kind, n_folds=n_folds, threshold=threshold)
+    if baseline is not None:
+        metrics["baseline"] = baseline
+        metrics["beats_baseline"] = _beats_baseline(overall, baseline, kind)
+
+    # Conditional performance: 99.7% of rows are calm, so an overall MAE is
+    # arithmetically dominated by days when persistence is unbeatable and
+    # says almost nothing about the days the dashboard exists for.
+    if kind == "regression":
+        event = _event_conditional_mae(X, y, per_fold_threshold=None)
+        if event:
+            metrics["event"] = event
+
     # final fit on all labeled rows
     final_model = _fit_lgbm(X, y, kind, params=params)
 
@@ -239,13 +260,85 @@ def train_with_backtest(frame, target_id: str, horizon_h: int,
         kind=kind,
         target_col=target_col,
         feature_cols=feat_cols,
-        metrics={"per_fold": per_fold, "overall_" + primary_key: overall,
-                 "n_folds": len(per_fold)},
+        metrics=metrics,
         n_train_rows=n,
         trained_ts=datetime.now(timezone.utc).isoformat(),
         threshold=threshold,
         model=final_model,
     )
+
+
+# ---- naive baselines ------------------------------------------------------
+
+#: Column holding the gauge's current stage -- the persistence prediction.
+PERSISTENCE_COL = "self__stage_ft"
+
+
+def _baseline_metrics(X, y, kind: str, *, n_folds: int = 5,
+                       threshold: float | None = None) -> dict | None:
+    """Score the trivial predictor on the same walk-forward folds.
+
+    Regression baseline is persistence: the future crest equals the current
+    stage. Classification baseline is "current stage already exceeds the
+    threshold", which is the decision a person would make without a model.
+    """
+    import numpy as np
+
+    if PERSISTENCE_COL not in X.columns:
+        return None
+    current = X[PERSISTENCE_COL]
+    scores: list[float] = []
+    for tr, te in walk_forward_splits(len(X), n_folds=n_folds,
+                                       min_train=max(10, len(X) // 5)):
+        cur_te, y_te = current.iloc[te], y.iloc[te]
+        if kind == "regression":
+            scores.append(float((y_te - cur_te).abs().mean()))
+        else:
+            if threshold is None or y_te.nunique() < 2:
+                continue
+            m = _classification_metrics(y_te, (cur_te >= threshold).astype(float))
+            if m.get("auc") is not None:
+                scores.append(float(m["auc"]))
+    if not scores:
+        return None
+    key = "mae" if kind == "regression" else "auc"
+    return {key: float(np.mean(scores)), "kind": "persistence",
+            "n_folds": len(scores)}
+
+
+def _beats_baseline(overall, baseline: dict, kind: str) -> bool | None:
+    """True when the model is actually worth shipping over the naive rule."""
+    if overall is None or not baseline:
+        return None
+    if kind == "regression":
+        ref = baseline.get("mae")
+        return None if ref is None else bool(overall < ref)
+    ref = baseline.get("auc")
+    return None if ref is None else bool(overall > ref)
+
+
+def _event_conditional_mae(X, y, *, per_fold_threshold=None,
+                            quantile: float = 0.99) -> dict | None:
+    """Error restricted to the highest-stage rows.
+
+    Reported alongside the overall figure so a model cannot hide poor flood
+    performance behind thousands of easy calm days.
+    """
+    import numpy as np
+
+    if PERSISTENCE_COL not in X.columns or len(y) < 100:
+        return None
+    cutoff = float(np.nanquantile(y, quantile))
+    mask = y >= cutoff
+    if int(mask.sum()) < 10:
+        return None
+    cur = X.loc[mask, PERSISTENCE_COL]
+    return {
+        "quantile": quantile,
+        "stage_cutoff_ft": cutoff,
+        "n_rows": int(mask.sum()),
+        "persistence_mae": float((y[mask] - cur).abs().mean()),
+    }
 
 
 # ---- inference ------------------------------------------------------------

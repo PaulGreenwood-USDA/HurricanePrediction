@@ -283,12 +283,32 @@ def cmd_ml_train(args):
             primary = bundle.metrics.get(key)
             label = (f"{kind}" if thr is None
                      else f"{kind} thr={thr}")
+            baseline = bundle.metrics.get("baseline") or {}
+            beats = bundle.metrics.get("beats_baseline")
+            ref = baseline.get("mae" if kind == "regression" else "auc")
+
+            verdict = ""
+            if ref is not None and primary is not None:
+                if beats:
+                    verdict = f"  BEATS persistence ({ref:.3f})"
+                else:
+                    ratio = (primary / ref if kind == "regression"
+                             else ref / primary)
+                    verdict = (f"  LOSES to persistence ({ref:.3f}, "
+                               f"{ratio:.1f}x worse)")
+
             out = default_model_path(
                 args.target,
                 f"{kind}" + (f"_thr{thr}" if thr is not None else ""),
                 h)
             bundle.save(out)
-            print(f"  [h={h}h {label}] {key}={primary}  -> {out}")
+            print(f"  [h={h}h {label}] {key}="
+                  f"{primary:.4f}" if primary is not None else
+                  f"  [h={h}h {label}] {key}=None")
+            print(f"      {verdict.strip() or 'no baseline available'}  -> {out}")
+
+    print("\nA model that loses to persistence should not be served. "
+          "serving.py reads metrics.beats_baseline.")
 
 
 def cmd_ml_predict(args):

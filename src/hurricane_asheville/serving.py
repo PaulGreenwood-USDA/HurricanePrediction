@@ -72,6 +72,18 @@ def forecast_all(history_df, *, base_dir: Path | str = DEFAULT_MODELS_DIR,
         except Exception as exc:  # noqa: BLE001
             log.warning("serving: failed to load %s: %s", p, exc)
             continue
+
+        # A model that loses to the naive baseline must not be served. The
+        # stage regressions lose to persistence at every horizon and in every
+        # regime -- at +6 h on rows whose future crest exceeds minor flood
+        # they are off by ~7 ft against persistence's ~1 ft, because a model
+        # trained on 99.7% calm rows regresses to the mean exactly when the
+        # river is rising. Publishing that as a forecast would be worse than
+        # publishing nothing.
+        if bundle.metrics.get("beats_baseline") is False:
+            log.info("serving: skipping %s (loses to its naive baseline)",
+                     p.name)
+            continue
         try:
             out = predict_latest(bundle, history_df,
                                   precip_entity_id=precip_entity_id)
@@ -146,10 +158,18 @@ def load_model_metrics(target_id: str,
         }
 
         if kind == "regression":
+            baseline = (metrics.get("baseline") or {}).get("mae")
+            beats = metrics.get("beats_baseline")
             out[f"regression_h{horizon}"] = {
                 **common,
                 "mae": metrics.get("overall_mae"),
-                "trustworthy": metrics.get("overall_mae") is not None,
+                "baseline_mae": baseline,
+                "beats_baseline": beats,
+                # Having a measurable error is not the same as being useful.
+                # A model that loses to "assume no change" is not trustworthy
+                # however tidy its MAE looks.
+                "trustworthy": bool(beats) if beats is not None
+                               else metrics.get("overall_mae") is not None,
             }
         elif kind == "classification":
             threshold = meta.get("threshold")
@@ -166,14 +186,18 @@ def load_model_metrics(target_id: str,
             auc = metrics.get("overall_auc")
             # 0.5 is what the metric code emits when AUC is undefined.
             auc_meaningful = auc is not None and abs(auc - 0.5) > 1e-9
+            beats = metrics.get("beats_baseline")
             out[f"classification_thr{threshold}_h{horizon}"] = {
                 **common,
                 "threshold": threshold,
                 "auc": auc if auc_meaningful else None,
+                "baseline_auc": (metrics.get("baseline") or {}).get("auc"),
+                "beats_baseline": beats,
                 "positive_events": positives,
                 "folds_with_events": folds_with_events,
                 "trustworthy": bool(
                     auc_meaningful
-                    and folds_with_events >= MIN_FOLDS_WITH_EVENTS),
+                    and folds_with_events >= MIN_FOLDS_WITH_EVENTS
+                    and beats is not False),
             }
     return out

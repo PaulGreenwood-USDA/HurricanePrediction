@@ -86,50 +86,69 @@
     "up_03451000__stage_ft__roll24_mean",
     "up_03451000__stage_ft__roll24_max",
     "up_03451000__stage_ft__roll24_min",
-    "up_03451000__stage_ft__roll24_std"
+    "up_03451000__stage_ft__roll24_std",
+    "precip__roll6_sum",
+    "precip__roll6_max",
+    "precip__roll24_sum",
+    "precip__roll24_max",
+    "precip__roll72_sum",
+    "precip__roll72_max",
+    "precip__api336_d99",
+    "soil_top",
+    "soil_top__roll24_mean",
+    "soil_top__roll24_max",
+    "soil_top__roll72_mean",
+    "soil_top__roll72_max",
+    "soil_deep"
   ],
   "metrics": {
     "per_fold": [
       {
-        "n": 7301,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7301,
-        "auc": 0.9988311612413068,
-        "ap": 0.9018748312860195,
-        "positive_rate": 0.009724695247226408,
+        "n": 7307,
+        "auc": 0.9988768987612796,
+        "ap": 0.9036147153617813,
+        "positive_rate": 0.009716710004105652,
         "fold": 1
       },
       {
-        "n": 7301,
-        "auc": 0.9935960937637383,
-        "ap": 0.8896608256139956,
-        "positive_rate": 0.019586358033146144,
+        "n": 7307,
+        "auc": 0.9798145740356796,
+        "ap": 0.8566487746182812,
+        "positive_rate": 0.019570275078691666,
         "fold": 2
       },
       {
-        "n": 7301,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7304,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 4
       }
     ],
-    "overall_auc": 0.9962136275025225,
-    "n_folds": 5
+    "overall_auc": 0.9893457363984797,
+    "n_folds": 5,
+    "baseline": {
+      "auc": 0.8734654696078379,
+      "kind": "persistence",
+      "n_folds": 2
+    },
+    "beats_baseline": true
   },
-  "n_train_rows": 45635,
-  "trained_ts": "2026-08-10T14:01:14.135005+00:00",
+  "n_train_rows": 45668,
+  "trained_ts": "2026-08-11T21:04:12.815552+00:00",
   "threshold": 6.5
 }

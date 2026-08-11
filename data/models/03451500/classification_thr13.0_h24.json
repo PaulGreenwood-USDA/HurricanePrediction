@@ -86,40 +86,53 @@
     "up_03451000__stage_ft__roll24_mean",
     "up_03451000__stage_ft__roll24_max",
     "up_03451000__stage_ft__roll24_min",
-    "up_03451000__stage_ft__roll24_std"
+    "up_03451000__stage_ft__roll24_std",
+    "precip__roll6_sum",
+    "precip__roll6_max",
+    "precip__roll24_sum",
+    "precip__roll24_max",
+    "precip__roll72_sum",
+    "precip__roll72_max",
+    "precip__api336_d99",
+    "soil_top",
+    "soil_top__roll24_mean",
+    "soil_top__roll24_max",
+    "soil_top__roll72_mean",
+    "soil_top__roll72_max",
+    "soil_deep"
   ],
   "metrics": {
     "per_fold": [
       {
-        "n": 7301,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7301,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 1
       },
       {
-        "n": 7301,
+        "n": 7307,
         "auc": 0.5,
-        "ap": 0.01301191617586632,
-        "positive_rate": 0.01301191617586632,
+        "ap": 0.013001231695634323,
+        "positive_rate": 0.013001231695634323,
         "fold": 2
       },
       {
-        "n": 7301,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7304,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
@@ -127,9 +140,15 @@
       }
     ],
     "overall_auc": 0.5,
-    "n_folds": 5
+    "n_folds": 5,
+    "baseline": {
+      "auc": 0.8736148816300319,
+      "kind": "persistence",
+      "n_folds": 1
+    },
+    "beats_baseline": false
   },
-  "n_train_rows": 45635,
-  "trained_ts": "2026-08-10T14:01:21.172361+00:00",
+  "n_train_rows": 45668,
+  "trained_ts": "2026-08-11T21:04:18.571697+00:00",
   "threshold": 13.0
 }
