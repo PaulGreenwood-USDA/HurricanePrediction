@@ -141,14 +141,17 @@
     ],
     "overall_auc": 0.7840374891736303,
     "n_folds": 5,
+    "target_col": "y_peak_above_6.5_72h",
+    "target_is_rise": false,
     "baseline": {
       "auc": 0.7544287458160965,
       "kind": "persistence",
       "n_folds": 2
     },
+    "beats_baseline_overall": true,
     "beats_baseline": true
   },
   "n_train_rows": 45668,
-  "trained_ts": "2026-08-11T21:04:48.282931+00:00",
+  "trained_ts": "2026-08-11T21:38:50.216837+00:00",
   "threshold": 6.5
 }

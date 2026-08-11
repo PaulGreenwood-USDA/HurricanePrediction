@@ -304,6 +304,23 @@
       </span>
     </h2>
 
+    {% set any_reg = ml.horizons | selectattr('event_mae') | list %}
+    {% if any_reg and any_reg[0].beats_overall is false %}
+    <div class="ml-caveat">
+      <b>What this forecast is good for.</b> The model predicts the
+      <em>change</em> in stage, not the level, and it is judged on the rows
+      where the river is actually rising &mdash; there it beats
+      &ldquo;assume no change&rdquo; at every horizon
+      ({% for h in any_reg %}&plusmn;{{ "%.2f"|format(h.event_mae) }} vs
+      &plusmn;{{ "%.2f"|format(h.event_baseline_mae) }} ft at +{{ h.horizon_h }}h{% if not loop.last %}; {% endif %}{% endfor %}).
+      Across <em>all</em> hours it is still worse than assuming no change,
+      because 99% of hours the river does nothing and zero is unbeatable. So
+      treat this as a rising-river forecast: useful when the stage is moving,
+      redundant when it is flat. The NWS NWPS trace above remains the
+      official forecast.
+    </div>
+    {% endif %}
+
     {% if ml.withheld_regression_horizons %}
     <div class="ml-caveat">
       <b>The stage forecast is withheld.</b> The trained model loses to the
@@ -345,7 +362,12 @@
             {% for b in ml.bands %}<span title="{{ b.level }}">{{ b.level[:2]|capitalize }} {{ b.stage }}</span>{% endfor %}
           </div>
           {% endif %}
-          {% if hz.mae %}
+          {% if hz.event_mae %}
+          <div class="h-delta flat" style="margin-top:.4rem; font-size:.68rem;">
+            &plusmn;{{ "%.2f"|format(hz.event_mae) }} ft when rising
+            <span class="dim">(no-change: &plusmn;{{ "%.2f"|format(hz.event_baseline_mae) }})</span>
+          </div>
+          {% elif hz.mae %}
           <div class="h-delta flat" style="margin-top:.4rem; font-size:.68rem;">
             backtest MAE &plusmn;{{ "%.2f"|format(hz.mae) }} ft
           </div>

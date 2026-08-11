@@ -160,11 +160,22 @@ def load_model_metrics(target_id: str,
         if kind == "regression":
             baseline = (metrics.get("baseline") or {}).get("mae")
             beats = metrics.get("beats_baseline")
+            event = metrics.get("event") or {}
             out[f"regression_h{horizon}"] = {
                 **common,
                 "mae": metrics.get("overall_mae"),
                 "baseline_mae": baseline,
                 "beats_baseline": beats,
+                "beats_baseline_overall": metrics.get("beats_baseline_overall"),
+                "target_is_rise": metrics.get("target_is_rise"),
+                # The error that actually applies when the river is rising,
+                # which is the only time anyone reads a stage forecast. Both
+                # this and the overall figure are surfaced, because the model
+                # wins one and loses the other and the reader deserves both.
+                "event_mae": event.get("model_mae"),
+                "event_baseline_mae": event.get("baseline_mae"),
+                "event_regime": event.get("regime"),
+                "event_rows": event.get("n_rows"),
                 # Having a measurable error is not the same as being useful.
                 # A model that loses to "assume no change" is not trustworthy
                 # however tidy its MAE looks.

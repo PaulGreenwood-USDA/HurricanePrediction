@@ -275,3 +275,35 @@ def test_forecast_qpf_is_not_a_feature():
     out = F.build_gauge_features(df, "G", upstream_ids=[],
                                   precip_entity_id="asheville")
     assert not [c for c in out.columns if "qpf" in c.lower()]
+
+
+# ---- rise target ----------------------------------------------------------
+
+def test_rise_target_is_future_max_minus_current():
+    """Predicting the change makes the naive baseline exactly zero, so any
+    explained variance is a real gain rather than the model re-learning its
+    own input."""
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    idx = pd.date_range("2024-01-01", periods=6, freq="h", tz="UTC")
+    s = pd.Series([1.0, 1.0, 5.0, 2.0, 1.0, 1.0], index=idx)
+    feats = pd.DataFrame(index=idx)
+    out = F.add_targets(feats, s, horizons=(2,))
+    # At t0 the next two hours peak at 5.0 while the current level is 1.0.
+    assert out["y_future_max_2h"].iloc[0] == pytest.approx(5.0)
+    assert out["y_future_rise_2h"].iloc[0] == pytest.approx(4.0)
+    # Level and rise stay consistent wherever both are defined.
+    both = out[["y_future_max_2h", "y_future_rise_2h"]].dropna()
+    recon = both["y_future_rise_2h"] + s.reindex(both.index)
+    assert (recon - both["y_future_max_2h"]).abs().max() == pytest.approx(0.0)
+
+
+def test_rise_target_is_zero_on_a_flat_river():
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    idx = pd.date_range("2024-01-01", periods=10, freq="h", tz="UTC")
+    s = pd.Series([2.0] * 10, index=idx)
+    out = F.add_targets(pd.DataFrame(index=idx), s, horizons=(3,))
+    assert out["y_future_rise_3h"].dropna().abs().max() == pytest.approx(0.0)

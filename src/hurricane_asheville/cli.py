@@ -287,14 +287,24 @@ def cmd_ml_train(args):
             beats = bundle.metrics.get("beats_baseline")
             ref = baseline.get("mae" if kind == "regression" else "auc")
 
+            ev = bundle.metrics.get("event") or {}
             verdict = ""
-            if ref is not None and primary is not None:
+            if kind == "regression" and ev.get("model_mae") is not None:
+                # The gate is the rising regime; the overall figure is shown
+                # too because a model can win one and lose the other.
+                arrow = "BEATS" if beats else "LOSES to"
+                verdict = (f"  {arrow} no-change on {ev['regime']} "
+                           f"({ev['model_mae']:.3f} vs {ev['baseline_mae']:.3f}"
+                           f", n={ev['n_rows']}); overall "
+                           f"{primary:.3f} vs {ref:.3f}"
+                           if ref is not None else "")
+            elif ref is not None and primary is not None:
                 if beats:
-                    verdict = f"  BEATS persistence ({ref:.3f})"
+                    verdict = f"  BEATS baseline ({ref:.3f})"
                 else:
                     ratio = (primary / ref if kind == "regression"
                              else ref / primary)
-                    verdict = (f"  LOSES to persistence ({ref:.3f}, "
+                    verdict = (f"  LOSES to baseline ({ref:.3f}, "
                                f"{ratio:.1f}x worse)")
 
             out = default_model_path(

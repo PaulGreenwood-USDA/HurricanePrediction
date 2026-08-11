@@ -205,27 +205,34 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
   [tests/test_gauge_registry.py](tests/test_gauge_registry.py). Verify any new
   site id against the USGS site service before adding it — a label and an id
   that disagree will otherwise show one river's data under another's name.
-- **ML forecast honesty.** Every model is scored against a naive baseline on
-  the same walk-forward folds, and `serving.py` refuses to publish one that
-  loses. Results for the French Broad at Asheville:
+- **ML forecast honesty.** The regression predicts the **change** in stage,
+  not the level. Predicting the level means predicting a quantity the model
+  already holds as a feature: it spends its capacity reproducing its own
+  input, and the level models lost to plain persistence by 2-4x. Against a
+  rise target the naive baseline is exactly zero, so any explained variance
+  is a real gain. Switching cut +6 h error 43% (0.121 -> 0.068 ft).
 
-  | head | metric | naive baseline | served? |
-  | --- | --- | --- | --- |
-  | stage regression +6/+24/+72 h | MAE 0.12 / 0.23 / 0.55 ft | persistence 0.03 / 0.10 / 0.26 ft | **no — 2-4x worse** |
-  | P(> action 6.5 ft) +6/+24/+72 h | AUC 0.98 / 0.99 / 0.78 | 0.96 / 0.87 / 0.75 | yes |
-  | P(> minor 9.5 ft), P(> moderate 13 ft) | AUC undefined | — | no |
+  Every head is scored against that baseline on the same walk-forward folds,
+  and `serving.py` refuses to publish one that fails. Because 99% of hours
+  the river does nothing — where zero is unbeatable and no model can do
+  better than tie — the gate uses the rows where the river is **actually
+  rising** (>= 0.5 ft). Judging on the full population would measure the calm
+  regime almost exclusively.
 
-  The stage regression loses to "assume no change" at every horizon *and in
-  every regime* — on rows whose future crest passes minor flood it is off by
-  ~7 ft where persistence is off by ~1 ft, because a model trained on a
-  record that is 99.7% calm regresses to the mean exactly when the river is
-  rising. It is therefore withheld, and the dashboard says so. Adding
-  rainfall and soil features (see below) did not change this, so the target
-  itself is the problem, not the inputs.
+  | head | rising rows | no-change | all hours | served? |
+  | --- | --- | --- | --- | --- |
+  | stage +6 h | MAE 1.08 ft | 1.30 ft | 0.07 vs 0.03 | yes |
+  | stage +24 h | 1.00 ft | 1.31 ft | 0.16 vs 0.10 | yes |
+  | stage +72 h | 1.21 ft | 1.53 ft | 0.50 vs 0.26 | yes |
+  | P(> action 6.5 ft) | AUC 0.98 / 0.99 / 0.78 | 0.96 / 0.87 / 0.75 | — | yes |
+  | P(> minor 9.5 ft), P(> moderate 13 ft) | AUC undefined | — | — | no |
 
-  Minor and moderate exceedance have been crossed once since 2021 (Helene),
-  giving a positive example in a single fold and an undefined AUC. Only the
-  action-stage heads are calibrated and served.
+  So the stage forecast is a *rising-river* forecast: useful when the stage
+  is moving, redundant when it is flat, and worse than assuming no change if
+  you average over every hour of the year. The card says exactly that rather
+  than quoting only the flattering number. Minor and moderate exceedance have
+  been crossed once since 2021 (Helene), giving a positive example in a
+  single fold and an undefined AUC, so those heads stay unserved.
 
 - **The models had never seen rainfall.** `features.py` requested
   `precip_in_24h` while the store writes `wx_precip_in_24h` (history adds the

@@ -278,10 +278,20 @@ def add_targets(features_df, series, horizons: Sequence[int],
     """Add forecast targets to a features frame.
 
     For each horizon ``h`` (in index steps):
-      - ``y_future_max_{h}h``  : max(series) over (t, t+h]
-      - ``y_future_val_{h}h``  : series.shift(-h)
+      - ``y_future_max_{h}h``   : max(series) over (t, t+h]
+      - ``y_future_rise_{h}h``  : that max *minus the current level*
+      - ``y_future_val_{h}h``   : series.shift(-h)
       - for each threshold ``thr`` (if given):
             ``y_peak_above_{thr}_{h}h`` : 0/1 if future_max exceeds ``thr``
+
+    Predicting the **rise** rather than the level is what makes the problem
+    learnable. On a level target the answer is dominated by the current
+    stage, which the model already has as a feature: it spends its capacity
+    reproducing its own input and adds noise doing so, which is why the level
+    models lost to persistence by 2-4x. Against a rise target, persistence is
+    exactly ``0``, so any explained variance in the rise is a real gain, and
+    reconstructing a level prediction is just ``current + predicted_rise``.
+
     Returns a *new* DataFrame (does not mutate input).
     """
     import pandas as pd
@@ -293,6 +303,9 @@ def add_targets(features_df, series, horizons: Sequence[int],
                        .rolling(window=h, min_periods=1).max()
                        .shift(-(h - 1)))
         out[f"y_future_max_{h}h"] = future_max
+        # The current level is s itself, which is also the self__stage_ft
+        # feature, so this subtraction introduces no leakage.
+        out[f"y_future_rise_{h}h"] = future_max - s
         out[f"y_future_val_{h}h"] = s.shift(-h)
         if thresholds:
             for thr in thresholds:

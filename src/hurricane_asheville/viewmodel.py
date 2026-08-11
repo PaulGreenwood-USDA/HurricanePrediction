@@ -202,6 +202,10 @@ def ml_card(state: dict) -> dict | None:
             "pred_pct": _band_pct(pred, axis_max),
             "above_minor": bool(stages.get("minor") and pred >= stages["minor"]),
             "mae": reg_metrics.get("mae"),
+            "event_mae": reg_metrics.get("event_mae"),
+            "event_baseline_mae": reg_metrics.get("event_baseline_mae"),
+            "event_regime": reg_metrics.get("event_regime"),
+            "beats_overall": reg_metrics.get("beats_baseline_overall"),
         })
     horizons.sort(key=lambda h: h["horizon_h"])
 
