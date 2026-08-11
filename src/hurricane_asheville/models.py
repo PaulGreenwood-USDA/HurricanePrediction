@@ -183,7 +183,8 @@ def train_with_backtest(frame, target_id: str, horizon_h: int,
                           *, kind: str = "regression",
                           threshold: float | None = None,
                           n_folds: int = 5,
-                          params: dict | None = None) -> ModelBundle:
+                          params: dict | None = None,
+                          predict_rise: bool = True) -> ModelBundle:
     """Train a final model on all data + report walk-forward OOS metrics.
 
     The returned bundle's ``metrics`` dict has keys
@@ -195,7 +196,11 @@ def train_with_backtest(frame, target_id: str, horizon_h: int,
     from datetime import datetime, timezone
 
     if kind == "regression":
-        target_col = f"y_future_max_{horizon_h}h"
+        # Default to the rise target. Predicting the level means predicting a
+        # quantity the model already holds as a feature, and it loses to
+        # persistence doing so; predicting the change is the open problem.
+        target_col = (f"y_future_rise_{horizon_h}h"
+                      if predict_rise else f"y_future_max_{horizon_h}h")
     elif kind == "classification":
         if threshold is None:
             raise ValueError("classification requires a threshold")
@@ -212,6 +217,9 @@ def train_with_backtest(frame, target_id: str, horizon_h: int,
         raise ValueError(f"need at least 10 labeled rows, got {n}")
 
     per_fold: list[dict] = []
+    oos_pred: list = []
+    oos_true: list = []
+    oos_current: list = []
     for fold_i, (tr, te) in enumerate(walk_forward_splits(n, n_folds=n_folds,
                                                             min_train=max(10, n // 5))):
         Xtr, Xte = X.iloc[tr], X.iloc[te]
@@ -225,10 +233,55 @@ def train_with_backtest(frame, target_id: str, horizon_h: int,
             m = _classification_metrics(yte, pred)
         m["fold"] = fold_i
         per_fold.append(m)
+        # Keep the out-of-sample predictions so conditional performance can be
+        # measured on the same rows, rather than only in aggregate.
+        oos_pred.append(np.asarray(pred, dtype="float64"))
+        oos_true.append(yte.to_numpy(dtype="float64"))
+        if PERSISTENCE_COL in Xte.columns:
+            oos_current.append(Xte[PERSISTENCE_COL].to_numpy(dtype="float64"))
 
     primary_key = "mae" if kind == "regression" else "auc"
     vals = [f[primary_key] for f in per_fold if f.get(primary_key) is not None]
     overall = (float(np.mean(vals)) if vals else None)
+
+    metrics = {"per_fold": per_fold, "overall_" + primary_key: overall,
+               "n_folds": len(per_fold)}
+
+    # Score the naive baseline on the *same* folds. Without this a model can
+    # look respectable on absolute error while being several times worse than
+    # doing nothing -- which is exactly what happened here: an MAE of 0.55 ft
+    # at +72 h reads like a credential until you notice persistence scores
+    # 0.26 ft on identical rows.
+    target_is_rise = target_col.startswith("y_future_rise_")
+    metrics["target_col"] = target_col
+    metrics["target_is_rise"] = target_is_rise
+
+    baseline = _baseline_metrics(X, y, kind, n_folds=n_folds,
+                                  threshold=threshold,
+                                  target_is_rise=target_is_rise)
+    if baseline is not None:
+        metrics["baseline"] = baseline
+        metrics["beats_baseline_overall"] = _beats_baseline(overall, baseline, kind)
+        metrics["beats_baseline"] = metrics["beats_baseline_overall"]
+
+    # Conditional performance decides whether a *flood* model is useful.
+    # 99.7% of rows are calm, where "nothing changes" is unbeatable and no
+    # model can do better than tie. Judging on the full population therefore
+    # measures the calm regime almost exclusively. What matters is whether
+    # the model helps once the river is actually rising, so that is what the
+    # gate uses -- with the overall figure kept alongside it, since a model
+    # that wins on events and loses overall is a real trade-off a reader
+    # deserves to see.
+    if kind == "regression" and oos_pred:
+        event = _rising_regime_metrics(
+            np.concatenate(oos_true), np.concatenate(oos_pred),
+            current=(np.concatenate(oos_current) if oos_current else None),
+            target_is_rise=target_is_rise)
+        if event:
+            metrics["event"] = event
+            if event.get("model_mae") is not None:
+                metrics["beats_baseline"] = bool(
+                    event["model_mae"] < event["baseline_mae"])
 
     # final fit on all labeled rows
     final_model = _fit_lgbm(X, y, kind, params=params)
@@ -239,13 +292,113 @@ def train_with_backtest(frame, target_id: str, horizon_h: int,
         kind=kind,
         target_col=target_col,
         feature_cols=feat_cols,
-        metrics={"per_fold": per_fold, "overall_" + primary_key: overall,
-                 "n_folds": len(per_fold)},
+        metrics=metrics,
         n_train_rows=n,
         trained_ts=datetime.now(timezone.utc).isoformat(),
         threshold=threshold,
         model=final_model,
     )
+
+
+# ---- naive baselines ------------------------------------------------------
+
+#: Column holding the gauge's current stage -- the persistence prediction.
+PERSISTENCE_COL = "self__stage_ft"
+
+
+def _baseline_metrics(X, y, kind: str, *, n_folds: int = 5,
+                       threshold: float | None = None,
+                       target_is_rise: bool = False) -> dict | None:
+    """Score the trivial predictor on the same walk-forward folds.
+
+    Persistence means "nothing changes". Against a *level* target that is the
+    current stage; against a *rise* target it is exactly zero. Getting this
+    wrong would compare the model to a nonsense reference, so the caller has
+    to say which target it trained on.
+
+    Classification baseline is "current stage already exceeds the threshold",
+    the decision a person would make without a model.
+    """
+    import numpy as np
+
+    if PERSISTENCE_COL not in X.columns:
+        return None
+    current = X[PERSISTENCE_COL]
+    scores: list[float] = []
+    for tr, te in walk_forward_splits(len(X), n_folds=n_folds,
+                                       min_train=max(10, len(X) // 5)):
+        cur_te, y_te = current.iloc[te], y.iloc[te]
+        if kind == "regression":
+            naive = 0.0 if target_is_rise else cur_te
+            scores.append(float((y_te - naive).abs().mean()))
+        else:
+            if threshold is None or y_te.nunique() < 2:
+                continue
+            m = _classification_metrics(y_te, (cur_te >= threshold).astype(float))
+            if m.get("auc") is not None:
+                scores.append(float(m["auc"]))
+    if not scores:
+        return None
+    key = "mae" if kind == "regression" else "auc"
+    return {key: float(np.mean(scores)),
+            "kind": "no-change" if target_is_rise else "persistence",
+            "n_folds": len(scores)}
+
+
+def _beats_baseline(overall, baseline: dict, kind: str) -> bool | None:
+    """True when the model is actually worth shipping over the naive rule."""
+    if overall is None or not baseline:
+        return None
+    if kind == "regression":
+        ref = baseline.get("mae")
+        return None if ref is None else bool(overall < ref)
+    ref = baseline.get("auc")
+    return None if ref is None else bool(overall > ref)
+
+
+#: A rise this size is the point at which the river is doing something worth
+#: forecasting. Below it, "nothing changes" is both true and unbeatable.
+RISING_CUTOFF_FT = 0.5
+
+
+def _rising_regime_metrics(y_true, y_pred, *, current=None,
+                            target_is_rise: bool = False,
+                            cutoff_ft: float = RISING_CUTOFF_FT) -> dict | None:
+    """Model vs naive error on the rows where the river is actually rising.
+
+    Both are measured on identical out-of-sample rows, so the comparison is
+    like for like. Returns None when there are too few rising rows to say
+    anything.
+    """
+    import numpy as np
+
+    y_true = np.asarray(y_true, dtype="float64")
+    y_pred = np.asarray(y_pred, dtype="float64")
+    if y_true.size < 100:
+        return None
+
+    if target_is_rise:
+        rise_true = y_true
+        naive = np.zeros_like(y_true)
+    else:
+        if current is None:
+            return None
+        current = np.asarray(current, dtype="float64")
+        rise_true = y_true - current
+        naive = current
+
+    mask = rise_true >= cutoff_ft
+    n = int(np.count_nonzero(mask))
+    if n < 10:
+        return None
+    return {
+        "regime": f"rise >= {cutoff_ft} ft",
+        "cutoff_ft": cutoff_ft,
+        "n_rows": n,
+        "n_total": int(y_true.size),
+        "model_mae": float(np.abs(y_true[mask] - y_pred[mask]).mean()),
+        "baseline_mae": float(np.abs(y_true[mask] - naive[mask]).mean()),
+    }
 
 
 # ---- inference ------------------------------------------------------------
@@ -278,13 +431,31 @@ def predict_latest(bundle: ModelBundle, history_df,
     X_last = feats[bundle.feature_cols].iloc[[-1]]
     ts = feats.index[-1]
 
-    if bundle.kind == "regression":
-        pred = float(bundle.model.predict(X_last)[0])
+    out = {"ts": str(ts), "kind": bundle.kind,
+           "target_id": bundle.target_id, "horizon_h": bundle.horizon_h,
+           "threshold": bundle.threshold}
+
+    if bundle.kind != "regression":
+        out["prediction"] = float(bundle.model.predict_proba(X_last)[0, 1])
+        return out
+
+    pred = float(bundle.model.predict(X_last)[0])
+    if bundle.target_col.startswith("y_future_rise_"):
+        # The model forecasts a change; callers want a stage. Reconstruct by
+        # adding the current level, and never let a negative predicted rise
+        # push the crest below where the river already is -- a *maximum* over
+        # the coming window cannot be lower than the present value.
+        current = X_last[PERSISTENCE_COL].iloc[0] if PERSISTENCE_COL in X_last else None
+        out["predicted_rise_ft"] = pred
+        out["current_stage_ft"] = (None if current is None or pd.isna(current)
+                                    else float(current))
+        if out["current_stage_ft"] is not None:
+            out["prediction"] = float(max(0.0, pred) + out["current_stage_ft"])
+        else:
+            out["prediction"] = None
     else:
-        pred = float(bundle.model.predict_proba(X_last)[0, 1])
-    return {"ts": str(ts), "prediction": pred, "kind": bundle.kind,
-             "target_id": bundle.target_id, "horizon_h": bundle.horizon_h,
-             "threshold": bundle.threshold}
+        out["prediction"] = pred
+    return out
 
 
 # ---- convenience ----------------------------------------------------------

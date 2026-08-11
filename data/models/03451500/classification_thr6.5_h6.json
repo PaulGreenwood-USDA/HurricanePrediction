@@ -86,50 +86,72 @@
     "up_03451000__stage_ft__roll24_mean",
     "up_03451000__stage_ft__roll24_max",
     "up_03451000__stage_ft__roll24_min",
-    "up_03451000__stage_ft__roll24_std"
+    "up_03451000__stage_ft__roll24_std",
+    "precip__roll6_sum",
+    "precip__roll6_max",
+    "precip__roll24_sum",
+    "precip__roll24_max",
+    "precip__roll72_sum",
+    "precip__roll72_max",
+    "precip__api336_d99",
+    "soil_top",
+    "soil_top__roll24_mean",
+    "soil_top__roll24_max",
+    "soil_top__roll72_mean",
+    "soil_top__roll72_max",
+    "soil_deep"
   ],
   "metrics": {
     "per_fold": [
       {
-        "n": 7301,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7301,
-        "auc": 0.9994129805489609,
-        "ap": 0.9497023470126356,
-        "positive_rate": 0.007259279550746473,
+        "n": 7307,
+        "auc": 0.9993705489749313,
+        "ap": 0.9480955382530025,
+        "positive_rate": 0.007253318735459148,
         "fold": 1
       },
       {
-        "n": 7301,
-        "auc": 0.9925373467112597,
-        "ap": 0.9547419519069678,
-        "positive_rate": 0.01712094233666621,
+        "n": 7307,
+        "auc": 0.9656775271512112,
+        "ap": 0.9362938498622351,
+        "positive_rate": 0.017106883810045163,
         "fold": 2
       },
       {
-        "n": 7301,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7304,
+        "n": 7307,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 4
       }
     ],
-    "overall_auc": 0.9959751636301103,
-    "n_folds": 5
+    "overall_auc": 0.9825240380630713,
+    "n_folds": 5,
+    "target_col": "y_peak_above_6.5_6h",
+    "target_is_rise": false,
+    "baseline": {
+      "auc": 0.9596288402180704,
+      "kind": "persistence",
+      "n_folds": 2
+    },
+    "beats_baseline_overall": true,
+    "beats_baseline": true
   },
-  "n_train_rows": 45635,
-  "trained_ts": "2026-08-10T14:00:40.136825+00:00",
+  "n_train_rows": 45668,
+  "trained_ts": "2026-08-11T21:37:40.864624+00:00",
   "threshold": 6.5
 }

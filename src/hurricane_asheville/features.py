@@ -85,6 +85,25 @@ def to_series(history_df, entity_id: str, metric: str,
 
 # ---- generic feature builders --------------------------------------------
 
+def _first_available(history_df, entity_id: str, metrics: Sequence[str],
+                      freq: str | None = None):
+    """First of ``metrics`` that actually has data for ``entity_id``.
+
+    Metric names have drifted (the store prefixes weather with ``wx_`` and
+    soil with ``soil_``), and a silent miss here is expensive: the caller
+    skips the whole feature block and the model trains without ever knowing
+    it is missing an input. Trying an explicit list makes the fallback
+    visible and keeps old stores working.
+    """
+    import pandas as pd
+
+    for metric in metrics:
+        s = to_series(history_df, entity_id, metric, freq=freq)
+        if not s.empty:
+            return s
+    return pd.Series(dtype="float64")
+
+
 def lag_features(series, lags: Sequence[int]):
     """One column per lag step. Lags are in *index units* (e.g. hours if
     the series is hourly). No leakage: column ``lag_k`` is ``series.shift(k)``.
@@ -199,14 +218,15 @@ def build_gauge_features(history_df, target_id: str,
         blocks.append(rolling_features(up, (6, 24)))
 
     if precip_entity_id is not None:
-        # Open-Meteo archive precip lives at daily cadence; resample to
-        # hourly via forward-fill so the rolling windows below behave.
-        # If the snapshot store has hourly precip_in_72h, prefer that.
-        precip = to_series(history_df, precip_entity_id, "precip_in_24h",
-                            freq=freq)
-        if precip.empty:
-            precip = to_series(history_df, precip_entity_id,
-                                "precip_in_72h", freq=freq)
+        # Metric names in the history store carry the prefix that
+        # history._weather_rows adds on write ("wx_"), and soil rows carry
+        # "soil_". Asking for the unprefixed name returned an empty series
+        # and the whole block was skipped in silence, so every model trained
+        # before this fix saw river stage and nothing else -- no rainfall at
+        # all, in a rainfall-driven flood model.
+        precip = _first_available(
+            history_df, precip_entity_id,
+            ("wx_precip_in_24h", "wx_precip_in", "precip_in_24h"), freq)
         if not precip.empty:
             precip.name = "precip"
             blocks.append(rolling_features(precip, (6, 24, 72),
@@ -214,6 +234,32 @@ def build_gauge_features(history_df, target_id: str,
             blocks.append(antecedent_precip_index(precip, window=14 * 24,
                                                     decay=0.99)
                           .to_frame())
+
+        # Forecast rainfall (wx_next_72h_precip_in) is deliberately *not* a
+        # feature yet. It only exists in snapshot rows, so it covers ~4% of
+        # the training frame and all of it sits in the final walk-forward
+        # fold. LightGBM would learn "qpf present => recent regime" -- a
+        # spurious time signal rather than hydrology. Revisit once the
+        # snapshot store has a year or two of it.
+
+        # Antecedent soil moisture: the pre-conditioner that decides whether
+        # a given rainfall total runs off or soaks in. ERA5 0-7 cm goes back
+        # five years; the live 0-1 cm layer only exists for recent months, so
+        # prefer the archive and fall back.
+        soil = _first_available(
+            history_df, precip_entity_id,
+            ("soil_era5_0_7cm", "soil_soil_moisture_top"), freq)
+        if not soil.empty:
+            soil.name = "soil_top"
+            blocks.append(soil.to_frame())
+            blocks.append(rolling_features(soil, (24, 72),
+                                            aggs=("mean", "max")))
+        deep = _first_available(
+            history_df, precip_entity_id,
+            ("soil_era5_7_28cm", "soil_soil_moisture_root"), freq)
+        if not deep.empty:
+            deep.name = "soil_deep"
+            blocks.append(deep.to_frame())
 
     if not blocks:
         return pd.DataFrame()
@@ -232,10 +278,20 @@ def add_targets(features_df, series, horizons: Sequence[int],
     """Add forecast targets to a features frame.
 
     For each horizon ``h`` (in index steps):
-      - ``y_future_max_{h}h``  : max(series) over (t, t+h]
-      - ``y_future_val_{h}h``  : series.shift(-h)
+      - ``y_future_max_{h}h``   : max(series) over (t, t+h]
+      - ``y_future_rise_{h}h``  : that max *minus the current level*
+      - ``y_future_val_{h}h``   : series.shift(-h)
       - for each threshold ``thr`` (if given):
             ``y_peak_above_{thr}_{h}h`` : 0/1 if future_max exceeds ``thr``
+
+    Predicting the **rise** rather than the level is what makes the problem
+    learnable. On a level target the answer is dominated by the current
+    stage, which the model already has as a feature: it spends its capacity
+    reproducing its own input and adds noise doing so, which is why the level
+    models lost to persistence by 2-4x. Against a rise target, persistence is
+    exactly ``0``, so any explained variance in the rise is a real gain, and
+    reconstructing a level prediction is just ``current + predicted_rise``.
+
     Returns a *new* DataFrame (does not mutate input).
     """
     import pandas as pd
@@ -247,6 +303,9 @@ def add_targets(features_df, series, horizons: Sequence[int],
                        .rolling(window=h, min_periods=1).max()
                        .shift(-(h - 1)))
         out[f"y_future_max_{h}h"] = future_max
+        # The current level is s itself, which is also the self__stage_ft
+        # feature, so this subtraction introduces no leakage.
+        out[f"y_future_rise_{h}h"] = future_max - s
         out[f"y_future_val_{h}h"] = s.shift(-h)
         if thresholds:
             for thr in thresholds:

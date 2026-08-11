@@ -202,6 +202,10 @@ def ml_card(state: dict) -> dict | None:
             "pred_pct": _band_pct(pred, axis_max),
             "above_minor": bool(stages.get("minor") and pred >= stages["minor"]),
             "mae": reg_metrics.get("mae"),
+            "event_mae": reg_metrics.get("event_mae"),
+            "event_baseline_mae": reg_metrics.get("event_baseline_mae"),
+            "event_regime": reg_metrics.get("event_regime"),
+            "beats_overall": reg_metrics.get("beats_baseline_overall"),
         })
     horizons.sort(key=lambda h: h["horizon_h"])
 
@@ -230,6 +234,13 @@ def ml_card(state: dict) -> dict | None:
         })
     probabilities.sort(key=lambda p: (p["horizon_h"], p["threshold"] or 0))
 
+    # The stage regression is withheld when it loses to persistence, which it
+    # currently does at every horizon. The card then carries exceedance
+    # probabilities only, and says why the forecast is absent rather than
+    # silently dropping a section the reader saw yesterday.
+    withheld = [k.replace("regression_h", "") for k, m in metrics.items()
+                if k.startswith("regression_h") and m.get("beats_baseline") is False]
+
     return {
         "site": site,
         "bands": bands,
@@ -238,6 +249,12 @@ def ml_card(state: dict) -> dict | None:
         "probabilities": probabilities,
         "any_untrustworthy": any(not p["trustworthy"] for p in probabilities),
         "trained_ts": ml.get("trained_ts") or _first_trained(ml),
+        "withheld_regression_horizons": sorted(withheld, key=lambda h: int(h)),
+        "baseline_mae": {
+            k.replace("regression_h", ""): m.get("baseline_mae")
+            for k, m in metrics.items() if k.startswith("regression_h")
+        },
+        "current_ft": current,
     }
 
 

@@ -116,12 +116,13 @@ def test_train_regression_produces_bundle(training_frame):
     assert b.target_id == "03451500"
     assert b.horizon_h == 6
     assert b.kind == "regression"
-    assert b.target_col == "y_future_max_6h"
+    assert b.target_col == "y_future_rise_6h"   # rise is the default
     assert len(b.feature_cols) > 5
     assert b.metrics["n_folds"] >= 1
     assert b.metrics["overall_mae"] is not None
-    # AR(1) + precip signal should be learnable -> MAE under raw std
-    raw_std = float(training_frame["y_future_max_6h"].dropna().std())
+    # AR(1) + precip signal should be learnable -> MAE under the spread of
+    # the target the model was actually trained on (the rise, by default).
+    raw_std = float(training_frame[b.target_col].dropna().std())
     assert b.metrics["overall_mae"] < raw_std
 
 
@@ -215,3 +216,157 @@ def test_default_model_path_layout(tmp_path):
     p = M.default_model_path("03451500", "regression", 24, base_dir=tmp_path)
     assert p.name == "regression_h24.joblib"
     assert p.parent.name == "03451500"
+
+
+# ---- naive baseline gate --------------------------------------------------
+
+def _tiny_frame(n=400, flood=False):
+    """Autoregressive stage series with optional flood ramps.
+
+    Ramps, not plateaus: the rise target is zero once the river is already
+    high, so a flat spike produces almost no *rising* rows to measure.
+    """
+    import numpy as np
+    import pandas as pd
+    idx = pd.date_range("2024-01-01", periods=n, freq="h", tz="UTC")
+    rng = np.random.default_rng(0)
+    stage = np.cumsum(rng.normal(0, 0.01, n)) + 2.0
+    if flood:
+        for start in range(n // 5, n - 40, max(40, n // 10)):
+            ramp = np.linspace(0, 6.0, 20)
+            stage[start:start + 20] += ramp
+            stage[start + 20:start + 40] += ramp[::-1]
+    df = pd.DataFrame({"self__stage_ft": stage}, index=idx)
+    df["y_future_max_6h"] = (df["self__stage_ft"][::-1]
+                             .rolling(6, min_periods=1).max()[::-1])
+    df["y_future_rise_6h"] = df["y_future_max_6h"] - df["self__stage_ft"]
+    return df
+
+
+def test_baseline_metrics_scores_persistence():
+    from hurricane_asheville import models as M
+    frame = _tiny_frame()
+    X, y, _ = M._split_X_y(frame, "y_future_max_6h")
+    base = M._baseline_metrics(X, y, "regression", n_folds=3)
+    assert base["kind"] == "persistence"
+    assert base["mae"] >= 0.0
+
+
+def test_baseline_absent_without_the_stage_column():
+    import pandas as pd
+    from hurricane_asheville import models as M
+    frame = pd.DataFrame({"other": [1.0] * 50, "y_future_max_6h": [1.0] * 50})
+    X, y, _ = M._split_X_y(frame, "y_future_max_6h")
+    assert M._baseline_metrics(X, y, "regression") is None
+
+
+def test_beats_baseline_direction_by_kind():
+    from hurricane_asheville import models as M
+    # regression: lower MAE wins
+    assert M._beats_baseline(0.1, {"mae": 0.2}, "regression") is True
+    assert M._beats_baseline(0.3, {"mae": 0.2}, "regression") is False
+    # classification: higher AUC wins
+    assert M._beats_baseline(0.9, {"auc": 0.8}, "classification") is True
+    assert M._beats_baseline(0.7, {"auc": 0.8}, "classification") is False
+
+
+def test_beats_baseline_none_when_unmeasurable():
+    from hurricane_asheville import models as M
+    assert M._beats_baseline(None, {"mae": 0.2}, "regression") is None
+    assert M._beats_baseline(0.2, {}, "regression") is None
+
+
+def test_train_records_baseline_and_verdict():
+    """Without this recorded, a model 4x worse than doing nothing ships
+    looking respectable."""
+    from hurricane_asheville import models as M
+    bundle = M.train_with_backtest(_tiny_frame(n=800), "G", 6, n_folds=3)
+    assert "baseline" in bundle.metrics
+    assert bundle.metrics["beats_baseline"] in (True, False)
+    assert bundle.metrics["baseline"]["kind"] == "no-change"
+
+
+def test_event_conditional_metrics_present_for_regression():
+    """An overall MAE is dominated by calm rows; the flood-day figure has to
+    be recorded separately or poor event performance stays invisible."""
+    from hurricane_asheville import models as M
+    # Needs enough rows that the top 1% is a usable sample -- the real frame
+    # has ~45k, so 1% is ~450 rows.
+    bundle = M.train_with_backtest(_tiny_frame(n=2000, flood=True), "G", 6,
+                                    n_folds=3)
+    ev = bundle.metrics.get("event")
+    assert ev is not None
+    assert ev["n_rows"] >= 10
+    assert ev["baseline_mae"] >= 0.0
+    assert ev["model_mae"] >= 0.0
+
+
+# ---- rise target + rising-regime gate -------------------------------------
+
+def test_train_defaults_to_the_rise_target():
+    """Level targets are dominated by the current stage, which the model
+    already holds as a feature."""
+    b = M.train_with_backtest(_tiny_frame(n=800), "G", 6, n_folds=3)
+    assert b.target_col == "y_future_rise_6h"
+    assert b.metrics["target_is_rise"] is True
+
+
+def test_train_can_still_use_the_level_target():
+    b = M.train_with_backtest(_tiny_frame(n=800), "G", 6, n_folds=3,
+                               predict_rise=False)
+    assert b.target_col == "y_future_max_6h"
+    assert b.metrics["target_is_rise"] is False
+
+
+def test_baseline_for_rise_target_is_zero_not_current_stage():
+    """Comparing a rise prediction against the current *stage* would measure
+    the model against a nonsense reference."""
+    frame = _tiny_frame(n=800)
+    X, y, _ = M._split_X_y(frame, "y_future_rise_6h")
+    rise_base = M._baseline_metrics(X, y, "regression", n_folds=3,
+                                     target_is_rise=True)
+    assert rise_base["kind"] == "no-change"
+    # Mean |rise| is small; mean |rise - stage| would be ~2.0 for this fixture.
+    assert rise_base["mae"] < 0.5
+
+
+def test_rising_regime_metrics_compare_like_for_like():
+    import numpy as np
+    truth = np.concatenate([np.zeros(200), np.full(50, 3.0)])
+    perfect = truth.copy()
+    out = M._rising_regime_metrics(truth, perfect, target_is_rise=True)
+    assert out["n_rows"] == 50
+    assert out["model_mae"] == pytest.approx(0.0)
+    assert out["baseline_mae"] == pytest.approx(3.0)
+
+
+def test_rising_regime_metrics_none_when_river_never_rises():
+    import numpy as np
+    flat = np.zeros(500)
+    assert M._rising_regime_metrics(flat, flat, target_is_rise=True) is None
+
+
+def test_gate_uses_the_rising_regime_not_the_overall_average():
+    """99% of hours the river does nothing, where zero is unbeatable. Judging
+    on the full population measures the calm regime almost exclusively."""
+    b = M.train_with_backtest(_tiny_frame(n=2000, flood=True), "G", 6,
+                               n_folds=3)
+    ev = b.metrics["event"]
+    assert ev["model_mae"] is not None and ev["baseline_mae"] is not None
+    assert b.metrics["beats_baseline"] == (ev["model_mae"] < ev["baseline_mae"])
+    # The overall verdict is recorded separately so the trade-off stays visible.
+    assert "beats_baseline_overall" in b.metrics
+
+
+def test_predict_latest_reconstructs_a_level_from_a_rise(big_hist_df,
+                                                           training_frame):
+    """The model forecasts change; callers want a stage."""
+    if "y_future_rise_6h" not in training_frame.columns:
+        pytest.skip("rise target missing")
+    b = M.train_with_backtest(training_frame, "03451500", 6, n_folds=3)
+    out = M.predict_latest(b, big_hist_df, precip_entity_id="asheville",
+                            upstream_ids=["03443000"])
+    assert out["predicted_rise_ft"] is not None
+    assert out["current_stage_ft"] is not None
+    # A future *maximum* can never sit below the present level.
+    assert out["prediction"] >= out["current_stage_ft"] - 1e-9

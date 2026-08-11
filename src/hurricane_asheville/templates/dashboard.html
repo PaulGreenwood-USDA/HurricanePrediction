@@ -293,7 +293,8 @@
   {% if ml %}
   <div class="card span12">
     <h2>
-      {{ jargon('ML forecast', 'ML stage forecast') }}
+      {% if ml.horizons %}{{ jargon('ML forecast', 'ML stage forecast') }}
+      {% else %}{{ jargon('ML forecast', 'ML flood probability') }}{% endif %}
       <span class="ml-subtitle">
         <span>LightGBM</span>
         <span class="dot" aria-hidden="true">&middot;</span>
@@ -302,6 +303,39 @@
         <span class="site-chip">site {{ ml.site }}</span>
       </span>
     </h2>
+
+    {% set any_reg = ml.horizons | selectattr('event_mae') | list %}
+    {% if any_reg and any_reg[0].beats_overall is false %}
+    <div class="ml-caveat">
+      <b>What this forecast is good for.</b> The model predicts the
+      <em>change</em> in stage, not the level, and it is judged on the rows
+      where the river is actually rising &mdash; there it beats
+      &ldquo;assume no change&rdquo; at every horizon
+      ({% for h in any_reg %}&plusmn;{{ "%.2f"|format(h.event_mae) }} vs
+      &plusmn;{{ "%.2f"|format(h.event_baseline_mae) }} ft at +{{ h.horizon_h }}h{% if not loop.last %}; {% endif %}{% endfor %}).
+      Across <em>all</em> hours it is still worse than assuming no change,
+      because 99% of hours the river does nothing and zero is unbeatable. So
+      treat this as a rising-river forecast: useful when the stage is moving,
+      redundant when it is flat. The NWS NWPS trace above remains the
+      official forecast.
+    </div>
+    {% endif %}
+
+    {% if ml.withheld_regression_horizons %}
+    <div class="ml-caveat">
+      <b>The stage forecast is withheld.</b> The trained model loses to the
+      naive "assume no change" baseline at every horizon
+      ({% for h in ml.withheld_regression_horizons %}+{{ h }}h{% if not loop.last %}, {% endif %}{% endfor %}),
+      and loses by the widest margin on exactly the rows that matter: on days
+      whose crest passes minor flood it is off by several feet where the
+      baseline is off by about one. A model trained on a record that is 99.7%
+      calm regresses to the mean precisely when the river is rising, so it is
+      not published as a forecast. Current stage
+      {% if ml.current_ft is not none %}({{ "%.2f"|format(ml.current_ft) }} ft){% endif %}
+      remains the best available estimate of the next few hours; the NWS NWPS
+      trace above is the real forecast.
+    </div>
+    {% endif %}
 
     <div class="ml-grid">
       {% for hz in ml.horizons %}
@@ -328,7 +362,12 @@
             {% for b in ml.bands %}<span title="{{ b.level }}">{{ b.level[:2]|capitalize }} {{ b.stage }}</span>{% endfor %}
           </div>
           {% endif %}
-          {% if hz.mae %}
+          {% if hz.event_mae %}
+          <div class="h-delta flat" style="margin-top:.4rem; font-size:.68rem;">
+            &plusmn;{{ "%.2f"|format(hz.event_mae) }} ft when rising
+            <span class="dim">(no-change: &plusmn;{{ "%.2f"|format(hz.event_baseline_mae) }})</span>
+          </div>
+          {% elif hz.mae %}
           <div class="h-delta flat" style="margin-top:.4rem; font-size:.68rem;">
             backtest MAE &plusmn;{{ "%.2f"|format(hz.mae) }} ft
           </div>
