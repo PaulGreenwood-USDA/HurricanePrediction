@@ -307,3 +307,51 @@ def test_rise_target_is_zero_on_a_flat_river():
     s = pd.Series([2.0] * 10, index=idx)
     out = F.add_targets(pd.DataFrame(index=idx), s, horizons=(3,))
     assert out["y_future_rise_3h"].dropna().abs().max() == pytest.approx(0.0)
+
+
+# ---- source preference ----------------------------------------------------
+
+def test_to_series_prefers_the_highest_resolution_source():
+    """A daily mean and an hourly max are different quantities; blending them
+    would make the model's own history change definition partway through."""
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    rows = []
+    for h in range(24):
+        rows.append({"ts": pd.Timestamp(f"2024-09-27T{h:02d}:00", tz="UTC"),
+                     "source": "usgs_iv", "entity_type": "gauge",
+                     "entity_id": "G", "metric": "stage_ft", "value": 24.0})
+    rows.append({"ts": pd.Timestamp("2024-09-27T00:00", tz="UTC"),
+                 "source": "usgs_dv", "entity_type": "gauge",
+                 "entity_id": "G", "metric": "stage_ft", "value": 18.0})
+    s = F.to_series(pd.DataFrame(rows), "G", "stage_ft", entity_type="gauge")
+    assert len(s) == 24                  # only the IV rows
+    assert s.max() == pytest.approx(24.0)
+    assert 18.0 not in set(s.values)     # the daily mean is not blended in
+
+
+def test_to_series_falls_back_when_preferred_source_absent():
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    rows = [{"ts": pd.Timestamp("2024-09-27T00:00", tz="UTC"),
+             "source": "usgs_dv", "entity_type": "gauge",
+             "entity_id": "G", "metric": "stage_ft", "value": 18.0}]
+    s = F.to_series(pd.DataFrame(rows), "G", "stage_ft", entity_type="gauge")
+    assert len(s) == 1 and s.iloc[0] == pytest.approx(18.0)
+
+
+def test_to_series_preference_can_be_disabled():
+    import pandas as pd
+    from hurricane_asheville import features as F
+
+    rows = [{"ts": pd.Timestamp("2024-09-27T00:00", tz="UTC"),
+             "source": "usgs_iv", "entity_type": "gauge",
+             "entity_id": "G", "metric": "stage_ft", "value": 24.0},
+            {"ts": pd.Timestamp("2024-09-27T01:00", tz="UTC"),
+             "source": "usgs_dv", "entity_type": "gauge",
+             "entity_id": "G", "metric": "stage_ft", "value": 18.0}]
+    s = F.to_series(pd.DataFrame(rows), "G", "stage_ft",
+                     entity_type="gauge", prefer_sources=None)
+    assert len(s) == 2

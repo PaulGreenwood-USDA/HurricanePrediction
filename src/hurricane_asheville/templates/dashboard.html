@@ -146,12 +146,12 @@
     </div>
     {% endif %}
 
-    {% if h.gauge_truncated %}
+    {% if h.daily_mean_series %}
     <div class="gauge-truncated">
-      Helene's recorded peak of {{ "%.1f"|format(h.helene_ft) }} ft is the
-      highest value the gauge reported, not the highest the river reached
-      &mdash; NWS carries the crest at {{ "%.1f"|format(h.record_ft) }} ft.
-      Treat the 2024 peak on this chart as a floor.
+      This chart plots <b>daily means</b>, which smooth flash crests away.
+      Helene shows as {{ "%.1f"|format(h.helene_ft) }} ft here; the gauge
+      itself recorded {{ "%.1f"|format(h.record_ft) }} ft at 15-minute
+      resolution, and did not fail. Read every peak on this chart as a floor.
     </div>
     {% endif %}
   </div>

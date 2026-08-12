@@ -23,10 +23,13 @@ from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
 
-# Helene's crest at Asheville. The USGS gauge stopped reporting partway up, so
-# the recorded daily value understates it; NWS carries the official crest.
+# Helene's crest at Asheville.
 HELENE_DATE = "2024-09-27"
 HELENE_LABEL = "Helene"
+
+#: Helene's instantaneous crest, from the USGS 15-minute record. Kept as a
+#: constant because the daily-mean series understates it by ~6 ft.
+HELENE_CREST_FT = 24.82
 
 
 @dataclass
@@ -44,7 +47,9 @@ class StageHistory:
     n_observations: int
     first_ts: str | None
     last_ts: str | None
-    gauge_truncated: bool = False
+    #: True when the plotted series is daily *means* rather than
+    #: instantaneous readings, so peaks on the chart understate real crests.
+    daily_mean_series: bool = False
 
 
 def _empty() -> StageHistory:
@@ -135,10 +140,13 @@ def build(*, site_id: str, current_ft: float | None,
         n_observations=int(len(series)),
         first_ts=str(series.index.min().date()),
         last_ts=str(series.index.max().date()),
-        # Helene overtopped the gauge; the recorded peak is short of the
-        # official crest, and saying so is the difference between "we measured
-        # 18 ft" and "the river went higher than the gauge could report".
-        gauge_truncated=bool(
+        # A plotted peak well below the known record means the series is
+        # daily means, not instantaneous readings -- a daily average smooths
+        # a flash crest away. (The gauge itself did not fail during Helene:
+        # the 15-minute record contains the full 24.82 ft crest at 17:38 on
+        # 2024-09-27 with no missing points. Only our daily-mean copy of it
+        # tops out at 18.47.)
+        daily_mean_series=bool(
             helene_ft is not None and record_ft is not None
             and record_ft - helene_ft > 1.0),
     )

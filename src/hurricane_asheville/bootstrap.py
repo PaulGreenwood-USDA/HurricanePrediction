@@ -142,6 +142,117 @@ def bootstrap_gauges(years: int = 5,
     return rows
 
 
+# ---- USGS instantaneous values (15-minute) --------------------------------
+
+USGS_IV_URL = "https://waterservices.usgs.gov/nwis/iv/"
+
+#: Gauges worth pulling at full resolution: the ML target plus its upstream
+#: predictors. Every other gauge is display-only, and 15-minute data for all
+#: 28 would be ~5M rows in a git-committed store for no modelling gain.
+IV_GAUGE_IDS = ("03451500", "03439000", "03443000", "03446000", "03451000")
+
+
+def fetch_usgs_iv(site_id: str, start: str, end: str,
+                   timeout: int = 180) -> list[tuple[str, float]]:
+    """15-minute gage height for one site over [start, end].
+
+    Returns ``[(iso_time, feet)]``. USGS 301-redirects this endpoint to
+    nwis.waterservices.usgs.gov, which requests follows automatically.
+    """
+    try:
+        r = requests.get(
+            USGS_IV_URL,
+            params={
+                "sites": site_id,
+                "parameterCd": "00065",
+                "startDT": start,
+                "endDT": end,
+                "format": "json",
+            },
+            timeout=timeout,
+            headers={"User-Agent": "hurricane-asheville/0.1"},
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("USGS IV fetch failed for %s %s..%s: %s",
+                    site_id, start, end, exc)
+        return []
+
+    series = (data.get("value") or {}).get("timeSeries") or []
+    out: list[tuple[str, float]] = []
+    for ts in series:
+        for v in (ts.get("values") or [{}])[0].get("value") or []:
+            try:
+                f = float(v["value"])
+            except (TypeError, ValueError):
+                continue
+            if f == -999999:
+                continue
+            t = v.get("dateTime")
+            if t:
+                out.append((t, f))
+    return out
+
+
+def _iv_to_hourly_max_rows(points: list[tuple[str, float]],
+                            site_id: str) -> list[dict]:
+    """Reduce 15-minute readings to hourly **maxima**.
+
+    Maxima, not means: a mean is what made the stored Helene peak read 18.47 ft
+    when the river actually crested at 24.82: averaging smooths a flash crest
+    away. The feature pipeline consumes hourly data, so storing all four
+    samples per hour would quadruple the store for no modelling gain -- but
+    taking the max keeps the peak that matters intact.
+    """
+    import pandas as pd
+
+    if not points:
+        return []
+    s = pd.Series({pd.to_datetime(t, utc=True): v for t, v in points})
+    s = s.sort_index().resample("1h").max().dropna()
+    return [{"ts": ts.isoformat(), "source": "usgs_iv",
+             "entity_type": "gauge", "entity_id": site_id,
+             "metric": "stage_ft", "value": float(v)}
+            for ts, v in s.items()]
+
+
+def bootstrap_gauges_iv(years: int = 5,
+                         site_ids: Sequence[str] | None = None,
+                         end: str | None = None,
+                         chunk_days: int = 365,
+                         pause_s: float = 1.0) -> list[dict]:
+    """High-resolution stage history for the modelling gauges.
+
+    The daily-mean backfill leaves the training frame ~93% forward-filled:
+    every lag feature reads the same repeated value and within-day dynamics
+    simply are not present, so no model can learn a rising limb from it.
+    Requests are chunked by year because a decade in one call is a large
+    response and a single timeout would lose the lot.
+    """
+    end_d = _dt.date.today() if end is None else _dt.date.fromisoformat(end)
+    start_d = end_d.replace(year=end_d.year - years)
+    sites = list(site_ids) if site_ids else list(IV_GAUGE_IDS)
+    log.info("bootstrap_gauges_iv: %d sites, %s -> %s", len(sites),
+              start_d, end_d)
+
+    rows: list[dict] = []
+    for sid in sites:
+        site_rows: list[dict] = []
+        cursor = start_d
+        while cursor < end_d:
+            chunk_end = min(cursor + _dt.timedelta(days=chunk_days), end_d)
+            pts = fetch_usgs_iv(sid, cursor.isoformat(), chunk_end.isoformat())
+            site_rows.extend(_iv_to_hourly_max_rows(pts, sid))
+            log.info("  %s %s..%s: %d raw -> %d hourly",
+                      sid, cursor, chunk_end, len(pts), len(site_rows))
+            cursor = chunk_end + _dt.timedelta(days=1)
+            if pause_s:
+                time.sleep(pause_s)
+        rows.extend(site_rows)
+    return rows
+
+
 # ---- Open-Meteo ERA5 archive ---------------------------------------------
 
 _DAILY_VARS = ("precipitation_sum", "temperature_2m_max",

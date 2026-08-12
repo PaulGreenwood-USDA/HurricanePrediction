@@ -434,6 +434,17 @@ def predict_latest(bundle: ModelBundle, history_df,
     for col in bundle.feature_cols:
         if col not in feats.columns:
             feats[col] = np.nan
+
+    # The frame's index is the union of every input series, so a daily precip
+    # or soil series running past the last gauge reading leaves trailing rows
+    # with no stage at all. Predicting from those yields a rise with nothing
+    # to add it to. Take the most recent row that actually has a stage.
+    if PERSISTENCE_COL in feats.columns:
+        usable = feats[feats[PERSISTENCE_COL].notna()]
+        if usable.empty:
+            return {"ts": None, "prediction": None, "kind": bundle.kind}
+        feats = usable
+
     X_last = feats[bundle.feature_cols].iloc[[-1]]
     ts = feats.index[-1]
 
