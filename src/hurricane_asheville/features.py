@@ -52,9 +52,17 @@ def default_upstream_for(target_id: str) -> list[str]:
 
 # ---- series construction --------------------------------------------------
 
+#: Sources for the same metric, best resolution first. A daily *mean* and an
+#: hourly *maximum* are different quantities; blending them into one series
+#: would make the model's own history change definition partway through, so
+#: the highest-resolution source available for an entity wins outright.
+SOURCE_PREFERENCE = ("usgs_iv", "snapshot", "usgs_dv", "open_meteo_archive")
+
+
 def to_series(history_df, entity_id: str, metric: str,
                *, entity_type: str | None = None,
-               freq: str | None = None):
+               freq: str | None = None,
+               prefer_sources: Sequence[str] | None = SOURCE_PREFERENCE):
     """Slice the long-form history to a single (entity, metric) series.
 
     Returns a numeric pd.Series indexed by UTC timestamp, sorted, with
@@ -69,9 +77,19 @@ def to_series(history_df, entity_id: str, metric: str,
     mask = (df["entity_id"] == entity_id) & (df["metric"] == metric)
     if entity_type is not None:
         mask &= (df["entity_type"] == entity_type)
-    sub = df.loc[mask, ["ts", "value"]].copy()
+    sub = df.loc[mask, ["ts", "value", "source"]].copy()
     if sub.empty:
         return pd.Series(dtype="float64", name=f"{entity_id}__{metric}")
+
+    # Take the single best source present rather than concatenating them.
+    if prefer_sources and "source" in sub.columns:
+        available = set(sub["source"].unique())
+        for src in prefer_sources:
+            if src in available:
+                sub = sub[sub["source"] == src]
+                break
+
+    sub = sub[["ts", "value"]]
     sub["ts"] = pd.to_datetime(sub["ts"], utc=True)
     sub = (sub.sort_values("ts")
               .drop_duplicates("ts", keep="last")

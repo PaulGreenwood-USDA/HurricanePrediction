@@ -104,54 +104,54 @@
   "metrics": {
     "per_fold": [
       {
-        "n": 7307,
+        "n": 7309,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7307,
-        "auc": 0.9988768987612796,
-        "ap": 0.9036147153617813,
-        "positive_rate": 0.009716710004105652,
+        "n": 7309,
+        "auc": 0.9681074021200984,
+        "ap": 0.6735549897009514,
+        "positive_rate": 0.011219045012997675,
         "fold": 1
       },
       {
-        "n": 7307,
-        "auc": 0.9798145740356796,
-        "ap": 0.8566487746182812,
-        "positive_rate": 0.019570275078691666,
+        "n": 7309,
+        "auc": 0.97030311496019,
+        "ap": 0.8794349676541962,
+        "positive_rate": 0.02052264331645916,
         "fold": 2
       },
       {
-        "n": 7307,
+        "n": 7309,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7307,
+        "n": 7312,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 4
       }
     ],
-    "overall_auc": 0.9893457363984797,
+    "overall_auc": 0.9692052585401442,
     "n_folds": 5,
     "target_col": "y_peak_above_6.5_24h",
     "target_is_rise": false,
     "baseline": {
-      "auc": 0.8734654696078379,
+      "auc": 0.8867597547139741,
       "kind": "persistence",
       "n_folds": 2
     },
     "beats_baseline_overall": true,
     "beats_baseline": true
   },
-  "n_train_rows": 45668,
-  "trained_ts": "2026-08-11T21:38:14.793386+00:00",
+  "n_train_rows": 45685,
+  "trained_ts": "2026-08-12T12:38:03.361710+00:00",
   "threshold": 6.5
 }

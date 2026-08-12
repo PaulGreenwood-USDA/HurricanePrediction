@@ -370,3 +370,33 @@ def test_predict_latest_reconstructs_a_level_from_a_rise(big_hist_df,
     assert out["current_stage_ft"] is not None
     # A future *maximum* can never sit below the present level.
     assert out["prediction"] >= out["current_stage_ft"] - 1e-9
+
+
+def test_predict_latest_skips_trailing_rows_with_no_stage():
+    """The feature frame's index is the union of every input series, so a
+    daily precip or soil series running past the last gauge reading leaves
+    trailing rows with no stage. Predicting from those produced a rise with
+    nothing to add it to, and the whole regression head silently vanished
+    from the dashboard."""
+    import numpy as np
+    import pandas as pd
+
+    idx = pd.date_range("2024-01-01", periods=400, freq="h", tz="UTC")
+    rows = []
+    for t, v in zip(idx, np.linspace(2.0, 2.5, len(idx))):
+        rows.append({"ts": t, "source": "usgs_iv", "entity_type": "gauge",
+                     "entity_id": "G", "metric": "stage_ft", "value": float(v)})
+    # Precipitation continues for two days beyond the last gauge reading.
+    for t in pd.date_range(idx[-1], periods=48, freq="h", tz="UTC"):
+        rows.append({"ts": t, "source": "open_meteo_archive",
+                     "entity_type": "point", "entity_id": "asheville",
+                     "metric": "wx_precip_in_24h", "value": 0.1})
+    hist = pd.DataFrame(rows)
+
+    frame = F.build_training_frame(hist, "G", horizons=(6,), upstream_ids=[],
+                                    precip_entity_id="asheville")
+    b = M.train_with_backtest(frame, "G", 6, n_folds=3)
+    out = M.predict_latest(b, hist, precip_entity_id="asheville",
+                            upstream_ids=[])
+    assert out["prediction"] is not None
+    assert out["current_stage_ft"] is not None

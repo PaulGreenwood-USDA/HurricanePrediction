@@ -198,3 +198,53 @@ def test_soil_rows_skip_nulls():
 
 def test_soil_empty_payload():
     assert bootstrap._soil_to_daily_rows({}, "point", "asheville") == []
+
+
+# ---- 15-minute instantaneous values ---------------------------------------
+
+def test_iv_reduced_to_hourly_maxima_not_means():
+    """A daily/hourly *mean* smooths a flash crest away -- it is why the
+    stored Helene peak read 18.47 ft when the river crested at 24.82."""
+    pts = [("2024-09-27T17:00:00.000-04:00", 20.0),
+           ("2024-09-27T17:15:00.000-04:00", 22.0),
+           ("2024-09-27T17:30:00.000-04:00", 24.82),
+           ("2024-09-27T17:45:00.000-04:00", 24.0)]
+    rows = bootstrap._iv_to_hourly_max_rows(pts, "03451500")
+    assert len(rows) == 1
+    assert rows[0]["value"] == pytest.approx(24.82)   # max, not mean (22.7)
+    assert rows[0]["source"] == "usgs_iv"
+    assert rows[0]["metric"] == "stage_ft"
+
+
+def test_iv_rows_empty_for_no_points():
+    assert bootstrap._iv_to_hourly_max_rows([], "03451500") == []
+
+
+def test_fetch_iv_parses_and_drops_sentinels(monkeypatch, fake_response):
+    payload = {"value": {"timeSeries": [{
+        "variable": {"variableCode": [{"value": "00065"}]},
+        "values": [{"value": [
+            {"dateTime": "2024-09-27T17:00:00.000-04:00", "value": "20.0"},
+            {"dateTime": "2024-09-27T17:15:00.000-04:00", "value": "-999999"},
+        ]}],
+    }]}}
+    monkeypatch.setattr(bootstrap.requests, "get",
+                        lambda *a, **k: fake_response(json_data=payload))
+    out = bootstrap.fetch_usgs_iv("03451500", "2024-09-27", "2024-09-28")
+    assert len(out) == 1
+    assert out[0][1] == pytest.approx(20.0)
+
+
+def test_fetch_iv_survives_network_error(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("timeout")
+    monkeypatch.setattr(bootstrap.requests, "get", boom)
+    assert bootstrap.fetch_usgs_iv("03451500", "2024-09-27", "2024-09-28") == []
+
+
+def test_iv_gauge_set_is_the_modelling_gauges_only():
+    """15-minute data for all 28 gauges would be ~5M rows in a committed
+    store for no modelling gain."""
+    from hurricane_asheville.gauge import SITE_FRENCH_BROAD_ASHEVILLE
+    assert SITE_FRENCH_BROAD_ASHEVILLE in bootstrap.IV_GAUGE_IDS
+    assert len(bootstrap.IV_GAUGE_IDS) <= 8

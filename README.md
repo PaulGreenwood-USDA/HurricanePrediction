@@ -126,10 +126,10 @@ every 60 seconds (in-process cache) and shows:
   reference lines, plus where today sits as a percentile *for this month*
 - **Hourly rainfall timing** — the 72 h total cannot tell a wet week from a
   flash flood, so the page shows the hourly curve and the wettest 6 h / 24 h
-- ML flood probability for the action stage, the only head that beats its
-  naive baseline. The stage regression is **withheld** because it loses to
-  "assume no change" at every horizon, and the card says so rather than
-  quietly omitting it (see [Method notes](#method-notes))
+- ML stage forecast and flood probability, showing the error that applies
+  **when the river is rising** alongside the naive baseline. Heads that lose
+  to their baseline are withheld rather than published with a caveat
+  (see [Method notes](#method-notes))
 - Active NHC Atlantic storms with their forecast track and cone of uncertainty
 - Active NWS alerts, current weather, soil moisture, 7-day antecedent precip
 - Live NOAA CO-OPS tide / surge observations for NC coastal stations
@@ -240,6 +240,24 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
   been crossed once since 2021 (Helene), giving a positive example in a
   single fold and an undefined AUC, so those heads stay unserved.
 
+- **Training data is real, not forward-filled.** The daily-mean backfill left
+  the training frame **93% forward-filled** — 45,671 hourly rows built from
+  3,053 actual observations, most of them daily averages. Every lag feature
+  read the same repeated value, and the within-day dynamics of a flash flood
+  simply were not present, so no model could learn a rising limb from it.
+  USGS serves 15-minute instantaneous values back to ~2008; five years are now
+  stored for the modelling gauges (target + four upstream) as hourly
+  **maxima** — maxima, not means, because averaging is what made the stored
+  Helene peak read 18.47 ft when the river crested at 24.82. Coverage went
+  **6.7% → 97.3%** genuinely observed, and rising-row error at +6 h improved
+  from a 17% edge over no-change to **45%**.
+
+  `to_series` now takes the single highest-resolution source available per
+  entity (`usgs_iv` > `snapshot` > `usgs_dv` > archive) rather than
+  concatenating them: a daily mean and an hourly maximum are different
+  quantities, and blending them would make the model's own history change
+  definition partway through.
+
 - **The models had never seen rainfall.** `features.py` requested
   `precip_in_24h` while the store writes `wx_precip_in_24h` (history adds the
   `wx_` prefix), so the block was skipped without error and every model
@@ -248,9 +266,11 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
   in (111 columns, ~95% coverage). Forecast QPF is deliberately excluded: it
   covers ~4% of rows, all in the final fold, so it would teach a time signal
   rather than hydrology.
-- **Helene's chart peak is a floor, not the crest.** The USGS gauge recorded
-  18.47 ft before it stopped reporting; NWS carries the crest at 24.82 ft. The
-  history card says so rather than presenting the recorded value as the peak.
+- **The Helene gauge did not fail.** The 15-minute record contains the full
+  **24.82 ft crest at 17:38 on 2024-09-27** with no missing points. The 18.47 ft
+  figure that appeared earlier was our *daily mean* copy of it — a daily average
+  smooths a flash crest away. The history card now says that, and stops warning
+  about it once a high-resolution series is stored for the gauge.
 - **The Flood Index has been validated against Helene.** `index-replay`
   reconstructs historical inputs and runs the *same* scorer the live page uses
   over 1,902 days (2021-05-27 to present). Result: Helene peaks at **96/100
@@ -284,6 +304,7 @@ Oryx runs gunicorn against [wsgi.py](wsgi.py), which adds `src/` to
 | NOAA CO-OPS datagetter                  | none      | Live NC tide / surge observations         |
 | NWS NWPS (api.water.noaa.gov)           | none      | Per-gauge flood thresholds (baked)        |
 | Open-Meteo ERA5 archive                 | none      | 5-year precip / soil-moisture backfill    |
+| USGS NWIS Instantaneous Values (hist.)  | none      | 5-year 15-min stage for modelling gauges  |
 | CSU Tropical Meteorology Project (PDF)  | bundled   | 2026 seasonal forecast constants          |
 
 All HTTP calls have timeouts and degrade gracefully when a service is offline;

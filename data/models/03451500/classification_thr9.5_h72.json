@@ -104,54 +104,54 @@
   "metrics": {
     "per_fold": [
       {
-        "n": 7307,
+        "n": 7309,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 0
       },
       {
-        "n": 7307,
+        "n": 7309,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 1
       },
       {
-        "n": 7307,
-        "auc": 0.5,
-        "ap": 0.022854796770220336,
-        "positive_rate": 0.022854796770220336,
+        "n": 7309,
+        "auc": 0.8762783178071378,
+        "ap": 0.3606167606939031,
+        "positive_rate": 0.022711725270214804,
         "fold": 2
       },
       {
-        "n": 7307,
+        "n": 7309,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 3
       },
       {
-        "n": 7307,
+        "n": 7312,
         "auc": null,
         "ap": null,
         "positive_rate": 0.0,
         "fold": 4
       }
     ],
-    "overall_auc": 0.5,
+    "overall_auc": 0.8762783178071378,
     "n_folds": 5,
     "target_col": "y_peak_above_9.5_72h",
     "target_is_rise": false,
     "baseline": {
-      "auc": 0.7843611097133465,
+      "auc": 0.7830625315204539,
       "kind": "persistence",
       "n_folds": 1
     },
-    "beats_baseline_overall": false,
-    "beats_baseline": false
+    "beats_baseline_overall": true,
+    "beats_baseline": true
   },
-  "n_train_rows": 45668,
-  "trained_ts": "2026-08-11T21:38:54.770649+00:00",
+  "n_train_rows": 45685,
+  "trained_ts": "2026-08-12T12:38:58.188009+00:00",
   "threshold": 9.5
 }

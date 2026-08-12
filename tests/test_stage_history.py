@@ -68,18 +68,21 @@ def test_finds_the_helene_peak():
     assert out.helene_date == "2024-09-27"
 
 
-def test_flags_that_the_gauge_was_overtopped():
-    """Helene's recorded peak understates the crest -- the gauge stopped
-    reporting. Presenting 18.47 as 'the peak' would be wrong."""
+def test_flags_a_daily_mean_series():
+    """The gauge did not fail during Helene -- the 15-minute record holds the
+    full 24.82 ft crest. A daily *mean* series tops out ~6 ft lower, and
+    presenting 18.47 as 'the peak' would be wrong."""
     out = sh.build(site_id="X", current_ft=1.7, history_df=_synthetic(),
                    thresholds={"record": 24.82})
-    assert out.gauge_truncated is True
+    assert out.daily_mean_series is True
 
 
-def test_not_flagged_when_record_matches_observation():
+def test_not_flagged_when_the_series_reaches_the_record():
+    """Once 15-minute data is stored the plotted peak matches the crest and
+    the caveat must stop firing."""
     out = sh.build(site_id="X", current_ft=1.7, history_df=_synthetic(),
                    thresholds={"record": 18.5})
-    assert out.gauge_truncated is False
+    assert out.daily_mean_series is False
 
 
 def test_axis_holds_the_record_line():
