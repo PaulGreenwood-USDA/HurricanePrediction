@@ -1,8 +1,22 @@
-"""Append-only historical snapshot store backed by monthly parquet partitions.
+"""Append-only history store backed by monthly parquet partitions.
 
-Every hourly dashboard refresh writes a slim *long-form* table to
-``data/history/snapshots/YYYY-MM.parquet`` with one row per
-(timestamp, entity_type, entity_id, metric, value).
+Two stores, read together, written separately:
+
+``data/history/snapshots/``
+    The live hourly job. Append-only, one row per
+    (timestamp, entity_type, entity_id, metric, value), written by
+    :func:`append_snapshot` and never rewritten.
+
+``data/history/backfill/``
+    Bootstrapped history -- USGS daily values, USGS 15-minute values, ERA5
+    archive -- written by :func:`append_long_rows`, rewritten only on an
+    explicit re-pull.
+
+They are separate because they used to share one file, and parquet is binary
+so git cannot merge it: every hourly commit conflicted with any branch
+carrying a backfill, and each conflict had to be unioned by hand. Splitting
+by lifecycle removes the overlap entirely. :func:`load_history` reads both,
+so callers see one logical store.
 
 Why long form
 =============
@@ -41,6 +55,21 @@ from typing import Iterable
 log = logging.getLogger(__name__)
 
 DEFAULT_HISTORY_DIR = Path("data/history/snapshots")
+
+#: Bootstrapped historical data (USGS daily values, USGS 15-minute values,
+#: ERA5 archive) lives apart from the live hourly snapshots.
+#:
+#: Not cosmetic: both used to append to ``snapshots/YYYY-MM.parquet``, so the
+#: hourly job and any branch carrying a backfill wrote the same file. Parquet
+#: is binary, git cannot merge it, and every hourly commit therefore produced
+#: an unmergeable conflict that had to be unioned by hand. The two have
+#: different lifecycles -- snapshots are append-only and live, backfills are
+#: immutable history rewritten only on an explicit re-pull -- so they get
+#: different directories and never collide.
+DEFAULT_BACKFILL_DIR = Path("data/history/backfill")
+
+#: Every directory :func:`load_history` reads by default.
+HISTORY_DIRS = (DEFAULT_HISTORY_DIR, DEFAULT_BACKFILL_DIR)
 
 
 # ---- snapshot -> long rows ------------------------------------------------
@@ -261,14 +290,24 @@ def _append_parquet(df, path: Path) -> Path:
 
 # ---- read helpers ---------------------------------------------------------
 
-def list_partitions(base_dir: Path | str = DEFAULT_HISTORY_DIR) -> list[Path]:
+def list_partitions(base_dir: Path | str | None = None) -> list[Path]:
+    """Parquet partitions to read.
+
+    With no argument this spans both the live snapshot store and the
+    backfill store; pass an explicit directory to restrict it.
+    """
+    if base_dir is None:
+        out: list[Path] = []
+        for d in HISTORY_DIRS:
+            out.extend(sorted(Path(d).glob("*.parquet")) if Path(d).exists() else [])
+        return out
     base = Path(base_dir)
     if not base.exists():
         return []
     return sorted(base.glob("*.parquet"))
 
 
-def load_history(*, base_dir: Path | str = DEFAULT_HISTORY_DIR,
+def load_history(*, base_dir: Path | str | None = None,
                   start: str | None = None,
                   end: str | None = None,
                   entity_type: str | None = None,
@@ -320,7 +359,7 @@ def pivot_metric(df, *, metric: str, entity_id: str | None = None):
 
 def drop_entities(entity_ids: Iterable[str],
                    *, entity_type: str | None = None,
-                   base_dir: Path | str = DEFAULT_HISTORY_DIR,
+                   base_dir: Path | str | None = None,
                    dry_run: bool = False) -> dict:
     """Delete every row for the given entity ids, partition by partition.
 
@@ -358,7 +397,7 @@ def drop_entities(entity_ids: Iterable[str],
             "partitions_rewritten": rewritten}
 
 
-def history_stats(base_dir: Path | str = DEFAULT_HISTORY_DIR) -> dict:
+def history_stats(base_dir: Path | str | None = None) -> dict:
     """Tiny audit summary, suitable for `cli ml-history-info`."""
     parts = list_partitions(base_dir)
     if not parts:
@@ -377,7 +416,7 @@ def history_stats(base_dir: Path | str = DEFAULT_HISTORY_DIR) -> dict:
 
 
 def append_long_rows(rows: Iterable[dict],
-                      *, base_dir: Path | str = DEFAULT_HISTORY_DIR) -> list[Path]:
+                      *, base_dir: Path | str = DEFAULT_BACKFILL_DIR) -> list[Path]:
     """Append a batch of already-long rows (used by the bootstrap loaders).
 
     Each row must have keys ``ts, source, entity_type, entity_id, metric,

@@ -231,3 +231,45 @@ def test_drop_entities_respects_entity_type(tmp_path):
 def test_drop_entities_no_targets_is_a_noop(tmp_path):
     from hurricane_asheville import history
     assert history.drop_entities([], base_dir=tmp_path)["removed"] == 0
+
+
+# ---- two stores, one logical history --------------------------------------
+
+def test_load_history_spans_snapshots_and_backfill(tmp_path, monkeypatch):
+    """Callers see one store even though writers are separated."""
+    from hurricane_asheville import history
+
+    snaps = tmp_path / "snapshots"
+    back = tmp_path / "backfill"
+    monkeypatch.setattr(history, "HISTORY_DIRS", (snaps, back))
+
+    history.append_long_rows(_rows([("2026-08-01", "G", "stage_ft", 1.0)]),
+                              base_dir=snaps)
+    history.append_long_rows(_rows([("2021-08-01", "G", "stage_ft", 2.0)]),
+                              base_dir=back)
+
+    df = history.load_history()
+    assert len(df) == 2
+    assert set(df["value"]) == {1.0, 2.0}
+
+
+def test_backfill_writer_does_not_touch_the_snapshot_store(tmp_path):
+    """The whole point: the hourly job and a backfill must never write the
+    same file, or every hourly commit conflicts irreconcilably."""
+    from hurricane_asheville import history
+
+    assert history.DEFAULT_BACKFILL_DIR != history.DEFAULT_HISTORY_DIR
+    # append_long_rows (the backfill writer) defaults to the backfill store.
+    import inspect
+    sig = inspect.signature(history.append_long_rows)
+    assert sig.parameters["base_dir"].default == history.DEFAULT_BACKFILL_DIR
+    # append_snapshot (the live writer) defaults to the snapshot store.
+    sig = inspect.signature(history.append_snapshot)
+    assert sig.parameters["base_dir"].default == history.DEFAULT_HISTORY_DIR
+
+
+def test_list_partitions_explicit_dir_is_unaffected(tmp_path):
+    from hurricane_asheville import history
+    history.append_long_rows(_rows([("2026-08-01", "G", "stage_ft", 1.0)]),
+                              base_dir=tmp_path)
+    assert len(history.list_partitions(tmp_path)) == 1
